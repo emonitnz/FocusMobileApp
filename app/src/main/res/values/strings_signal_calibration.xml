@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- [Workload B] Strings owned by this workload. Keep new strings here, not in strings.xml,
+     so the four workloads never edit the same resource file. -->
+<resources>
+</resources>
