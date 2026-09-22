@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- [Workload D] Calibration task content and copy. Separate from strings_ui_onboarding.xml only
+     because the reading passages are bulky; both files belong to workload D. -->
+<resources>
+
+    <string name="cal_title">Calibration</string>
+    <string name="cal_intro_body">Nine short blocks, about nine minutes. You will do nothing, read,
+        and then something deliberately hard. The app compares your brain activity across the three
+        to learn what concentrating looks like for you.</string>
+    <string name="cal_intro_rules">Keep your eyes open the whole time, including the easy blocks —
+        closing them changes the signal far more than concentrating does, and would make the result
+        meaningless. Sit still, and stay off your phone apart from the tasks.</string>
+    <string name="cal_intro_start">Start calibration</string>
+
+    <string name="cal_baseline_body">Just sit comfortably and look at the dot. This gives the
+        headset time to settle and sets today\'s baseline.</string>
+
+    <string name="cal_blocked_title">Check the headband</string>
+    <string name="cal_blocked_body">Contact is too poor to record usable data. Move the band down
+        onto your forehead, tuck the ear pieces in behind your ears, and wait for all four sensors
+        to turn green.</string>
+    <string name="cal_blocked_disconnected">The headset is not connected. Calibration needs a live
+        signal.</string>
+
+    <string name="cal_block_progress">Block %1$d of %2$d</string>
+    <string name="cal_countdown">Starting in %1$d</string>
+    <string name="cal_rest">Rest. Next block starts shortly.</string>
+
+
+    <string name="cal_task_fixation">Look at the dot. Let your mind wander.</string>
+    <string name="cal_task_reading">Read at a comfortable pace. There is a question afterwards.</string>
+    <string name="cal_task_nback">Tap MATCH when the letter is the same as the one <i>two</i>
+        letters ago.</string>
+    <string name="cal_task_nback_button">MATCH</string>
+    <string name="cal_task_subtraction">Keep subtracting 7. Type each answer.</string>
+    <string name="cal_task_subtraction_from">Start from %1$d</string>
+
+    <string name="cal_question_title">One question</string>
+    <string name="cal_question_skip">Not sure</string>
+
+    <string name="cal_fitting">Working out your thresholds…</string>
+
+    <string name="cal_result_title">Calibration complete</string>
+    <string name="cal_result_auc">Separation (AUC)</string>
+    <string name="cal_result_auc_good">Clear separation between low and high demand. Good signal.</string>
+    <string name="cal_result_auc_fair">Some separation, but weak. The app will work, less reliably.</string>
+    <string name="cal_result_auc_poor">Barely better than chance. This is a real result about
+        consumer EEG, not a mistake — but check the headband fit and try again before relying on it.</string>
+    <string name="cal_result_means">Low demand %1$s · high demand %2$s</string>
+    <string name="cal_result_thresholds">Hold above %1$s, release below %2$s</string>
+    <string name="cal_result_tasks">Task accuracy: reading %1$s, hard blocks %2$s</string>
+    <string name="cal_result_accept">Use these thresholds</string>
+    <string name="cal_result_redo">Run it again</string>
+
+    <string name="cal_abort">Stop calibration</string>
+
+    <!-- Reading passages. Neutral, self-contained, roughly 60 seconds at a comfortable pace. -->
+    <string name="cal_passage_1_text">The Antikythera mechanism was recovered from a shipwreck off
+        the Greek island of the same name in 1901, and for half a century nobody could say what it
+        was. The corroded bronze fragments held gear teeth cut to a precision that would not be seen
+        again for well over a thousand years. X-ray imaging in the 1970s, and computed tomography in
+        2005, eventually settled the question: it was an astronomical calculator. Turning a handle
+        on the side advanced the date, and pointers on the faces moved to show the positions of the
+        sun and moon, the phase of the moon, and the timing of eclipses. One dial tracked the
+        four-year cycle of athletic games. The device encoded the irregular motion of the moon
+        through a pin-and-slot arrangement between two gears mounted slightly off-centre, which
+        produced a varying speed from a constant input. Nothing else of comparable complexity
+        survives from the ancient world, and no text describes it directly.</string>
+    <string name="cal_passage_1_question">What did turning the handle on the side of the mechanism
+        do?</string>
+    <string name="cal_passage_1_a">Advanced the date and moved the astronomical pointers</string>
+    <string name="cal_passage_1_b">Wound a spring that drove the device for a day</string>
+    <string name="cal_passage_1_c">Selected which of the four-year games to display</string>
+
+    <string name="cal_passage_2_text">For most of the twentieth century it was assumed that stomach
+        ulcers were caused by stress and excess acid, and treated accordingly, with bland diets and
+        acid suppression that relieved symptoms without curing anything. In 1982 two researchers in
+        Perth, Barry Marshall and Robin Warren, proposed that a spiral bacterium living in the
+        stomach lining was responsible. The claim was poorly received: the stomach was held to be
+        far too acidic for bacteria to survive. Unable to infect an animal model and frustrated by
+        the slow pace of review, Marshall drank a culture of the organism himself. He developed
+        gastritis within days, and a biopsy confirmed the bacterium had colonised his stomach. The
+        pair received the Nobel Prize in 2005. The condition is now routinely cured with a course of
+        antibiotics.</string>
+    <string name="cal_passage_2_question">Why did Marshall drink the bacterial culture?</string>
+    <string name="cal_passage_2_a">He could not infect an animal model and review was slow</string>
+    <string name="cal_passage_2_b">He wanted to prove the stomach was not acidic</string>
+    <string name="cal_passage_2_c">It was the standard test for gastritis at the time</string>
+
+    <string name="cal_passage_3_text">Venice is built on millions of wooden piles driven into the
+        silt of the lagoon. Alder, larch and oak were floated down from the forests of Slovenia and
+        Croatia, sharpened, and hammered through the soft upper mud until they met a denser layer of
+        compacted clay beneath. The buildings do not rest on the wood so much as on that clay, with
+        the piles acting as a way of reaching it. The timber has survived for centuries because it
+        sits permanently below the waterline, where there is almost no oxygen, and the organisms
+        that rot wood cannot work. Minerals carried by the water have gradually infiltrated the
+        grain, leaving the piles harder than when they were driven. The threat to the city has never
+        been the foundations; it is the rising water above them.</string>
+    <string name="cal_passage_3_question">Why has the timber under Venice not rotted?</string>
+    <string name="cal_passage_3_a">It sits below the waterline where there is almost no oxygen</string>
+    <string name="cal_passage_3_b">The species used are naturally resistant to decay</string>
+    <string name="cal_passage_3_c">It was treated with minerals before being driven</string>
+</resources>

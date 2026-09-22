@@ -2,4 +2,148 @@
 <!-- [Workload D] Strings owned by this workload. Keep new strings here, not in strings.xml,
      so the four workloads never edit the same resource file. -->
 <resources>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Before you start</string>
+    <string name="onboarding_intro">This app watches your concentration and holds notifications
+        while you are focused. Android needs you to grant a few things first — the two marked
+        Required are what actually hold notifications back.</string>
+    <string name="onboarding_progress">%1$d of %2$d granted</string>
+    <string name="onboarding_required_missing">You can continue without these, but notifications
+        will be delivered normally until they are granted.</string>
+    <string name="onboarding_all_set">All set. You can change any of this later in Settings.</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_skip_all">Skip for now</string>
+
+    <string name="perm_required">Required</string>
+    <string name="perm_optional">Recommended</string>
+    <string name="perm_granted">Granted</string>
+    <string name="perm_action_grant">Grant</string>
+    <string name="perm_action_open">Open settings</string>
+
+    <string name="perm_notifications_title">Show notifications</string>
+    <string name="perm_notifications_body">So the app can show its own ongoing notification while
+        running, and deliver the catch-up summary when your focus breaks.</string>
+
+    <string name="perm_bluetooth_title">Find your headset</string>
+    <string name="perm_bluetooth_body">The Muse headband connects over Bluetooth. Without this the
+        app has no signal to work from.</string>
+    <string name="perm_bluetooth_body_legacy">On this version of Android, Bluetooth scanning is
+        gated behind location permission. The app does not use your location.</string>
+
+    <string name="perm_listener_title">Read notifications</string>
+    <string name="perm_listener_body">So the app knows what arrived while you were focused and can
+        summarise it afterwards. It only records what arrived — it never reads message contents.</string>
+    <string name="perm_listener_hint">Android opens a list of every app on your phone. Find
+        \"%1$s\" in it, turn it on, then come back here.</string>
+
+    <string name="perm_dnd_title">Control Do Not Disturb</string>
+    <string name="perm_dnd_body">This is how notifications are actually held back. The app turns Do
+        Not Disturb on while you are concentrating and off again when you stop.</string>
+    <string name="perm_dnd_hint">Android opens its Do Not Disturb access list. Find
+        \"%1$s\", allow it, then come back here.</string>
+
+    <string name="perm_battery_title">Keep running in the background</string>
+    <string name="perm_battery_body">Android and some phone manufacturers shut down background apps
+        aggressively. Without this exemption the headset connection will be killed mid-session.</string>
+
+    <!-- Home -->
+    <string name="home_title">Focus</string>
+    <string name="home_master_switch">Hold my notifications</string>
+    <string name="home_master_switch_on">Running — deferral is active while you are focused</string>
+    <string name="home_master_switch_off">Off — notifications are delivered normally</string>
+    <string name="home_state_focused">Focused</string>
+    <string name="home_state_not_focused">Not focused</string>
+    <string name="home_state_unknown">No reading</string>
+    <string name="home_state_for">for %1$s</string>
+    <string name="home_signal_title">Focus index</string>
+    <string name="home_signal_subtitle">Standard deviations from your rolling baseline. The shaded
+        band is the zone where nothing changes.</string>
+    <string name="home_signal_waiting">Waiting for the headset to settle…</string>
+    <string name="home_device_title">Headset</string>
+    <string name="home_device_disconnected">Disconnected</string>
+    <string name="home_device_scanning">Looking for your headset…</string>
+    <string name="home_device_connecting">Connecting…</string>
+    <string name="home_device_connected">Connected</string>
+    <string name="home_device_poor_contact">Poor contact</string>
+    <string name="home_device_battery">Battery %1$d%%</string>
+    <string name="home_contact_hint">Move the headband down onto your forehead and tuck the ear
+        pieces in behind your ears. Damp fingertips on the sensors help.</string>
+    <string name="home_deferred_title">Held back</string>
+    <string name="home_deferred_count">%1$d waiting</string>
+    <string name="home_deferred_none">Nothing held back right now.</string>
+    <string name="home_deferred_release">Release now</string>
+    <string name="home_needs_calibration">Calibrate before you start — the app has no idea what
+        focused looks like for you yet.</string>
+    <string name="home_recalibrate_suggested">Your readings have drifted from the last calibration.
+        Worth running it again.</string>
+    <string name="home_needs_permissions">Some permissions are missing, so notifications will be
+        delivered normally.</string>
+    <string name="home_action_calibrate">Calibrate</string>
+    <string name="home_action_fix">Fix</string>
+
+    <!-- Stats -->
+    <string name="stats_title">Stats</string>
+    <string name="stats_total_focus">Total focus</string>
+    <string name="stats_longest_streak">Longest streak</string>
+    <string name="stats_deferred">Held back</string>
+    <string name="stats_delivered">Delivered</string>
+    <plurals name="stats_sessions">
+        <item quantity="one">%1$d session</item>
+        <item quantity="other">%1$d sessions</item>
+    </plurals>
+    <string name="stats_time_of_day">When you focus</string>
+    <string name="stats_time_of_day_sub">Focused time by hour of day, across every session.</string>
+    <string name="stats_history">Sessions</string>
+    <string name="stats_session_line">%1$s focused · %2$d held back</string>
+    <string name="stats_empty_title">No sessions yet</string>
+    <string name="stats_empty_body">Turn the switch on from the Focus tab and the first session
+        will show up here when it ends.</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_focus">Focus</string>
+    <string name="settings_exit_timeout">Pause before releasing</string>
+    <string name="settings_exit_timeout_body">How long your concentration has to drop before
+        notifications are released. Short values mean a glance out the window ends the session;
+        long values mean messages wait longer after you have genuinely stopped.</string>
+    <string name="settings_entry_dwell">Delay before holding</string>
+    <string name="settings_entry_dwell_body">How long you have to be concentrating before the app
+        starts holding notifications. Stops a momentary spike from silencing your phone.</string>
+    <string name="settings_seconds">%1$d s</string>
+    <string name="settings_minutes">%1$d min</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_max_hold">Never hold longer than</string>
+    <string name="settings_max_hold_body">A safety valve. Whatever the headset says, nothing is
+        held back for longer than this.</string>
+    <string name="settings_breakthrough">Always let through</string>
+    <string name="settings_allow_calls">Phone calls</string>
+    <string name="settings_allow_alarms">Alarms</string>
+    <string name="settings_allow_repeat">Repeat callers</string>
+    <string name="settings_allow_starred">Starred contacts</string>
+    <string name="settings_allow_2fa">Verification codes</string>
+    <string name="settings_calibration">Calibration</string>
+    <string name="settings_calibration_never">Not calibrated yet</string>
+    <string name="settings_calibration_done">Calibrated %1$s · separation %2$s</string>
+    <string name="settings_recalibrate">Run calibration</string>
+    <string name="settings_developer">Developer</string>
+    <string name="settings_demo_mode">Demo mode</string>
+    <string name="settings_demo_mode_body">Always on for now: the headset, signal and notification
+        modules are not wired up yet, so everything runs on a synthetic signal.</string>
+    <string name="settings_fast_calibration">Fast calibration</string>
+    <string name="settings_fast_calibration_body">Six-second blocks instead of sixty. Same nine
+        blocks and the same phases, so the flow can be tested without sitting through it.</string>
+    <string name="settings_raw_logging">Log raw EEG</string>
+    <string name="settings_raw_logging_body">For offline analysis. Off by default — it writes a lot
+        of data.</string>
+    <string name="settings_high_task">High-demand task</string>
+    <string name="settings_task_nback">2-back</string>
+    <string name="settings_task_subtraction">Serial subtraction</string>
+    <string name="settings_load_placeholder">Load placeholder thresholds</string>
+    <string name="settings_load_placeholder_body">Skips calibration with untuned values so the rest
+        of the app can be tested. Not fitted to you.</string>
+    <string name="settings_clear_history">Clear session history</string>
+    <string name="settings_permissions">Re-run permission setup</string>
+
+    <string name="action_cancel">Cancel</string>
 </resources>

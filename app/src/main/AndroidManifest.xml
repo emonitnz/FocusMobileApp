@@ -2,7 +2,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- [Sprint 0] Declared up front so the four workloads never race on this file.
+         Workload D's onboarding flow requests them; see DESIGN.md §5. -->
+
+    <!-- Muse headset over BLE (31+); ACCESS_FINE_LOCATION is the pre-31 equivalent for scanning. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="30" />
+
+    <!-- Foreground service hosting the BLE connection and the decision loop. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+    <!-- Our own notifications: the service notification and the catch-up summary. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- AutomaticZenRule, i.e. the v1 suppression mechanism. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- Doze and OEM battery killers terminate the service; see dontkillmyapp.com. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- The headset is the whole point, but BLE-less devices should still install for demos. -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <application
+        android:name=".FocusApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
