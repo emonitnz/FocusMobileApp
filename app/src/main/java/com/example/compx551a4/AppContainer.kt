@@ -11,6 +11,7 @@ import com.example.compx551a4.core.Suppressor
 import com.example.compx551a4.data.SessionStore
 import com.example.compx551a4.data.UiPreferences
 import com.example.compx551a4.device.FakeEegSource
+import com.example.compx551a4.device.OscEegSource
 import com.example.compx551a4.ui.preview.DemoEegSource
 import com.example.compx551a4.ui.preview.DemoFocusEngine
 import com.example.compx551a4.ui.preview.DemoNotificationPolicy
