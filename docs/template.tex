@@ -1,0 +1,261 @@
+% template.tex — starting point for a new deck
+%
+% Theme:  metropolis (https://github.com/matze/mtheme), default light colours
+%
+% Build:  make DECK=template                        (pdflatex, bare texlive-latex)
+%         make DECK=template ENGINE=lualatex        (Fira Sans, needs texlive-luatex)
+%         make DECK=template ENGINE=xelatex         (same, needs texlive-xetex)
+%
+%         make DECK=template present                (pdfpc, presenter notes)
+%
+% metropolis only loads Fira Sans under a unicode engine and warns instead of
+% failing under pdflatex, so all three build. That warning is filtered below.
+% See README.md.
+%
+% Copy this file, rename it, fill in the title block and the six sections. The
+% demo frame near the top shows how a frame and its presenter note are written;
+% delete it once the deck has real content.
+
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% metropolis warns once per pdflatex run that it cannot load Fira. That is the
+% documented fallback, not a fault, so drop the warning rather than let it hide
+% a real one. Must be loaded before \usetheme, which is what emits it.
+\usepackage{silence}
+\WarningFilter{beamerthememetropolis}{You need to compile}
+
+\usetheme[
+  progressbar=frametitle,   % thin progress bar under the frame title
+  numbering=fraction,       % "3 / 12" in the footer
+  block=fill,               % filled block bodies
+  sectionpage=progressbar,
+  subsectionpage=none,
+]{metropolis}
+
+\usepackage{iftex}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{adjustbox}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{relsize}
+
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,shapes.geometric}
+
+% ------------------------------------------------------------------ fonts ---
+% metropolis picks up Fira Sans by itself under lualatex/xelatex. It also wants
+% Fira Mono, which is not installed here; point the mono face at the Fira Code
+% build of the same family instead. Under pdflatex none of this applies and the
+% deck falls back to Latin Modern.
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+  \setmonofont{FiraCode Nerd Font Mono}[Scale=MatchLowercase]
+\fi
+
+% -------------------------------------------------------------- title page ---
+% metropolis sizes its title-page minipage to \paperheight, which is taller than
+% the text area of even a plain frame, so \maketitle overfills its vbox by
+% 15.64pt on every deck. Same template, sized to \textheight. The content is
+% \vfill-centred either way, so this moves the block down by half the overflow.
+\makeatletter
+\setbeamertemplate{title page}{
+  \begin{minipage}[b][\textheight]{\textwidth}
+    \ifx\inserttitlegraphic\@empty\else\usebeamertemplate*{title graphic}\fi
+    \vfill%
+    \ifx\inserttitle\@empty\else\usebeamertemplate*{title}\fi
+    \ifx\insertsubtitle\@empty\else\usebeamertemplate*{subtitle}\fi
+    \usebeamertemplate*{title separator}
+    \ifx\beamer@shortauthor\@empty\else\usebeamertemplate*{author}\fi
+    \ifx\insertdate\@empty\else\usebeamertemplate*{date}\fi
+    \ifx\insertinstitute\@empty\else\usebeamertemplate*{institute}\fi
+    \vfill
+    \vspace*{1mm}
+  \end{minipage}
+}
+\makeatother
+
+% ---------------------------------------------------------------- colours ---
+% Pale fills for diagram nodes, one dark grey for rules and captions.
+\definecolor{shellbg}{gray}{0.96}
+\definecolor{rulegrey}{gray}{0.45}
+\definecolor{fill1}{RGB}{226,238,248}
+\definecolor{fill2}{RGB}{250,235,215}
+\definecolor{fill3}{RGB}{233,243,231}
+\definecolor{fill4}{RGB}{243,243,243}
+
+% ------------------------------------------------------------- tikz styles ---
+\tikzset{
+  every node/.style={font=\small},
+  box/.style={draw,rounded corners=2pt,align=center,minimum height=9mm,
+              inner xsep=7pt,inner ysep=5pt,font=\small},
+  flow/.style={-{Stealth[length=2.4mm]},thick},
+  back/.style={-{Stealth[length=2.4mm]},thick,dashed},
+  lbl/.style={font=\footnotesize,inner sep=2pt,align=center},
+}
+
+% ---------------------------------------------------------------- listings ---
+\lstdefinestyle{plain}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{shellbg},
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{rulegrey},
+  numberstyle=\tiny\color{rulegrey},
+  frame=single,
+  rulecolor=\color{rulegrey},
+  framesep=6pt,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  upquote=true,
+  showstringspaces=false,
+}
+\lstset{style=plain}
+
+% ---------------------------------------------------------------- helpers ---
+% Deliberately sets no size: inside a \footnotesize tikz node, forcing \small
+% here makes the mono text wider than the node and overfills it.
+\newcommand{\file}[1]{{\ttfamily #1}}
+
+% -------------------------------------------------------------- pdfpc ---
+% Presenter notes for pdfpc. The notes ride inside this PDF as zero-size PDF
+% annotations, so there is still one file and it opens normally in any viewer;
+% only pdfpc reads them. No separate .pdfpc sidecar and no double-width
+% notes-on-second-screen page geometry.
+%
+%   overridenote  maps beamer's \note{...} onto \pdfpcnote, so notes are
+%                 written with the command beamer users already know. A note
+%                 must sit INSIDE its \begin{frame}...\end{frame}; beamer's
+%                 after-the-frame \note form does not reach pdfpc.
+%   duration      talk length in minutes, drives the presenter-screen timer.
+%   lastminutes   timer turns red with this many minutes left.
+%
+% The note body is written into a PDF string, not typeset, so it takes plain
+% text, not LaTeX: no \textbf, no math, no macros. pdfpc renders it as markdown
+% (discount), so *emphasis*, **bold** and "- " bullets work.
+%
+% Line breaks are the one trap. A line break in the source is just a space by
+% the time it reaches the PDF string, and markdown joins single newlines into
+% one paragraph anyway. Only \\ emits a newline, so every bullet has to end
+% with \\ or the whole note renders as one run-on paragraph. Two \\ start a new
+% paragraph.
+%
+% Parentheses are fine in pairs but not singly, and % and # are still
+% TeX-special, so write them \% and \#.
+\usepackage[overridenote,duration=10,lastminutes=2]{pdfpc}
+
+% ------------------------------------------------------------------ title ---
+% \titlegraphic{\hfill\includegraphics[height=2.8cm]{figures/logo.png}}
+\title{COMPX551 Assignment 4}
+\subtitle{Muse Headset}
+\author{Hamish, Jesse, Mohammad, Richard}
+\institute{University of Waikato}
+
+\begin{document}
+
+\maketitle
+
+% =============================================================== demo frame ===
+% How a frame works, and how its presenter note works. Delete this frame once
+% the deck has real content; keep it while more than one person is editing.
+\begin{frame}[fragile]{How a frame is written}
+  The argument to \file{frame} is the frame title. Body text is plain LaTeX: a
+  blank line starts a new paragraph, and metropolis spaces them for you.
+
+  \begin{itemize}
+    \item A bullet list is the usual \file{itemize}
+    \item \alert{alert} colours a phrase in the theme's accent
+  \end{itemize}
+
+  A fixed-width block, for a command or a config line:
+
+  \begin{lstlisting}
+docker run --rm -it alpine sh
+  \end{lstlisting}
+
+  \note{
+    - This text is a presenter note, shown only by pdfpc on the second screen\\
+    - It sits INSIDE the frame environment, just before the frame ends\\
+    - Every line ends with a double backslash, or the note renders as one paragraph\\
+    - It is plain text, not LaTeX: no macros, no bold command; markdown *emphasis* works\\
+    - Escape \% and \# ; keep parentheses in pairs
+  }
+\end{frame}
+
+\begin{frame}{Frame options worth knowing}
+  \begin{itemize}
+    \item \file{\textbackslash begin\{frame\}[fragile]} is required when the body
+          holds a \file{verbatim} or \file{lstlisting} environment that beamer
+          cannot read ahead over
+    \item \file{[plain]} drops the frame title, footer and progress bar, for a
+          full-bleed figure
+    \item \file{[standout]} inverts the frame, for a section break or a closing slide
+    \item \file{[allowframebreaks]} splits an overlong frame across several slides
+  \end{itemize}
+
+  A figure scaled to whatever space is left:
+
+  \begin{center}
+    \begin{adjustbox}{max width=\textwidth, max totalheight=0.35\textheight}
+      \begin{tikzpicture}[node distance=12mm]
+        \node[box,fill=fill1] (a) {Input};
+        \node[box,fill=fill3,right=of a] (b) {Process};
+        \node[box,fill=fill2,right=of b] (c) {Output};
+        \draw[flow] (a) -- (b);
+        \draw[flow] (b) -- (c);
+      \end{tikzpicture}
+    \end{adjustbox}
+  \end{center}
+
+  \note{
+    - Second demo frame: frame options and a scaled figure\\
+    - adjustbox keeps a figure inside the frame whatever its natural size
+  }
+\end{frame}
+
+% =============================================================================
+\section{Application and its Purpose}
+
+\begin{frame}{Application and its Purpose}
+\end{frame}
+
+% =============================================================================
+\section{Architecture and device integration}
+
+\begin{frame}{Architecture and device integration}
+\end{frame}
+
+% =============================================================================
+\section{Data processing}
+
+\begin{frame}{Data processing}
+\end{frame}
+
+% =============================================================================
+\section{Visualisation and summary data}
+
+\begin{frame}{Visualisation and summary data}
+\end{frame}
+
+% =============================================================================
+\section{Cultural and ethical considerations}
+
+\begin{frame}{Cultural and ethical considerations}
+\end{frame}
+
+% =============================================================================
+\section{Reflection and future work}
+
+\begin{frame}{Reflection and future work}
+\end{frame}
+
+% =============================================================================
+\begin{frame}[standout]
+  Thanks
+\end{frame}
+
+\end{document}
