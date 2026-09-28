@@ -73,13 +73,33 @@ class MuseEegSource(
         manager.setContext(appContext)
         manager.setMuseListener(museListener)
 
+        synchronized(lock) { lastPacketAtMs = 0L }
+        beginScan()
+
+        tickJob = scope.launch { tickLoop() }
+        watchdogJob = scope.launch { watchdogLoop() }
+    }
+
+    private fun beginScan() {
         _status.value = DeviceStatus(DeviceState.SCANNING, deviceName = preferredMac ?: "Muse (scanning)")
         manager.stopListening()
         manager.startListening()
         Log.d(TAG, "startListening() called, waiting for museListChanged()")
+    }
 
-        tickJob = scope.launch { tickLoop() }
-        watchdogJob = scope.launch { watchdogLoop() }
+    private fun rescanAfterDrop(reason: String, delayMs: Long) {
+        activeMuse?.let { muse ->
+            muse.unregisterAllListeners()
+            muse.disconnect()
+        }
+        activeMuse = null
+        synchronized(lock) { lastPacketAtMs = 0L }
+        _status.value = DeviceStatus.DISCONNECTED
+        Log.w(TAG, "$reason — rescanning in ${delayMs}ms")
+        scope.launch {
+            delay(delayMs)
+            if (!stopped && activeMuse == null) beginScan()
+        }
     }
 
     override fun stop() {
@@ -90,6 +110,7 @@ class MuseEegSource(
             muse.disconnect()
         }
         activeMuse = null
+        synchronized(lock) { lastPacketAtMs = 0L }
         tickJob?.cancel()
         watchdogJob?.cancel()
         tickJob = null
@@ -138,14 +159,14 @@ class MuseEegSource(
             Log.d(TAG, "connection state -> ${p.currentConnectionState}")
             when (p.currentConnectionState) {
                 ConnectionState.CONNECTED -> {
+                    synchronized(lock) { lastPacketAtMs = System.currentTimeMillis() }
                     _status.value = _status.value.copy(state = DeviceState.CONNECTED, deviceName = muse.name)
                 }
                 ConnectionState.CONNECTING -> {
                     _status.value = _status.value.copy(state = DeviceState.CONNECTING, deviceName = muse.name)
                 }
                 ConnectionState.DISCONNECTED -> {
-                    activeMuse = null
-                    _status.value = DeviceStatus.DISCONNECTED
+                    if (!stopped) rescanAfterDrop("connection reported DISCONNECTED", RESCAN_DELAY_MS)
                 }
                 ConnectionState.NEEDS_UPDATE, ConnectionState.NEEDS_LICENSE -> {
                     activeMuse = null
@@ -250,7 +271,6 @@ class MuseEegSource(
         val betaAvg = average(snapshot.bands.beta)
         val thetaAvg = average(snapshot.bands.theta)
         val gammaAvg = average(snapshot.bands.gamma)
-
         val emgLikeArtifact = gammaAvg > EMG_GAMMA_THRESHOLD && betaAvg > EMG_BETA_THRESHOLD
 
         val bandPowers = BandPowers(
@@ -291,10 +311,14 @@ class MuseEegSource(
     private suspend fun watchdogLoop() {
         while (true) {
             delay(periodMs)
-            val silentFor = System.currentTimeMillis() - lastPacketAtMs
-            if (lastPacketAtMs != 0L && silentFor > staleTimeoutMs && _status.value.state != DeviceState.DISCONNECTED) {
-                Log.w(TAG, "watchdog: no packets for ${silentFor}ms, marking DISCONNECTED")
-                _status.value = DeviceStatus.DISCONNECTED
+            val state = _status.value.state
+            // Only meaningful once connected: during SCANNING/CONNECTING no packets are expected.
+            if (state != DeviceState.CONNECTED && state != DeviceState.POOR_CONTACT) continue
+            val last = synchronized(lock) { lastPacketAtMs }
+            if (last == 0L) continue
+            val silentFor = System.currentTimeMillis() - last
+            if (silentFor > staleTimeoutMs) {
+                rescanAfterDrop("watchdog: no packets for ${silentFor}ms", RESCAN_DELAY_MS)
             }
         }
     }
@@ -325,6 +349,7 @@ class MuseEegSource(
 
     companion object {
         private const val TAG = "MuseEegSource"
+        private const val RESCAN_DELAY_MS = 2_000L
         private const val TP9_INDEX = 0
         private const val TP10_INDEX = 3
         private const val EMG_GAMMA_THRESHOLD = 3.0
