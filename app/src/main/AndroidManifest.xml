@@ -29,6 +29,11 @@
     <!-- The headset is the whole point, but BLE-less devices should still install for demos. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
+    <!-- Legacy Bluetooth permission still required by some LibMuse-internal calls even when
+     targeting API 31+ with the scoped BLUETOOTH_SCAN/BLUETOOTH_CONNECT above. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+
     <application
         android:name=".FocusApp"
         android:allowBackup="true"
