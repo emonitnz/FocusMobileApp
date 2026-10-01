@@ -45,7 +45,8 @@ data class PreparedCalibration(
  *    high-demand — the worst data the fitter can receive. LOW has no task and is always kept.
  * 2. **Settling.** Epochs in the first [settleMs] of the block are discarded. They cover the
  *    switch into the task, and with 2-4 s analysis windows, the first epochs still contain signal
- *    from before the block started.
+ *    from before the block started. A short block settles for [settleFraction] of its length
+ *    instead, so the developer fast mode (6 s blocks) is not left with almost nothing to fit.
  * 3. **Artifacts.** Every epoch goes through a fresh [ArtifactRejector], in time order, so the
  *    thresholds are fitted on exactly the data the live pipeline would have accepted.
  *
@@ -55,6 +56,7 @@ data class PreparedCalibration(
  */
 class CalibrationSession(
     val settleMs: Long = DEFAULT_SETTLE_MS,
+    val settleFraction: Double = DEFAULT_SETTLE_FRACTION,
     val minAccuracy: Double = DEFAULT_MIN_ACCURACY,
     private val newRejector: () -> ArtifactRejector = { ArtifactRejector() },
 ) {
@@ -73,7 +75,7 @@ class CalibrationSession(
             }
             kept += block
 
-            val from = block.startedAtMs + settleMs
+            val from = block.startedAtMs + settleFor(block)
             val to = block.startedAtMs + block.durationMs
             accepted
                 .filter { it.timestampMs in from..to }
@@ -88,6 +90,10 @@ class CalibrationSession(
         return epochs.sortedBy { it.timestampMs }.filter { rejector.check(it) == null }
     }
 
+    /** [settleMs], or [settleFraction] of the block when that is shorter. */
+    fun settleFor(block: CalibrationBlock): Long =
+        minOf(settleMs, (block.durationMs * settleFraction).toLong())
+
     private fun dropReason(block: CalibrationBlock): DropReason? {
         if (block.condition == CalibrationCondition.LOW) return null
         val score = block.taskScore ?: return DropReason.NO_TASK_SCORE
@@ -99,6 +105,9 @@ class CalibrationSession(
     companion object {
         /** Covers a 4 s analysis window plus a second or so of orienting to the task. */
         const val DEFAULT_SETTLE_MS = 5_000L
+
+        /** 5 s of a 60 s block, so a full-length run settles for exactly [DEFAULT_SETTLE_MS]. */
+        const val DEFAULT_SETTLE_FRACTION = 1.0 / 12
 
         /**
          * Pressing at random on the 2-back scores about 50%, so below this the user was not doing
