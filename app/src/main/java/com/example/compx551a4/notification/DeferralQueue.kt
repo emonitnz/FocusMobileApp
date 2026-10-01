@@ -1,14 +1,9 @@
 package com.example.compx551a4.notification
-//can be considered as memory that collected the blocked notification and remembered it
+import com.example.compx551a4.core.DeferredNotification
+
 // [C] Holds what arrived during focus, max-hold timer, grouped catch-up summary on break.
-
-data class DeferredNotification(
-    val packageName: String,//which app the the notification is from
-    val title: String,
-    val text: String
-)
-
 /**
+ * this is considered as memory that collects the blocked notification in a queue and remembered it
  * this is the queue that will hold all the notification(queue Manager)
  */
 class DeferralQueue {

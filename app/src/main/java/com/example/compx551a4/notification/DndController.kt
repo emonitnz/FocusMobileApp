@@ -6,6 +6,9 @@ import android.content.Context
 import android.net.Uri
 import android.service.notification.Condition
 
+/**
+ * this class will block the notification depanding on the focus state
+ */
 class DndController(
     private val context: Context//Context gives our class access to Android system services.
 ) {
