@@ -225,9 +225,118 @@ docker run --rm -it alpine sh
 
 % =============================================================================
 \section{Architecture and device integration}
-
-\begin{frame}{Architecture and device integration}
+ 
+\begin{frame}{System overview}
+  EEG in, a focus state out, one policy applied consistently downstream.
+ 
+  \begin{center}
+    \begin{adjustbox}{max width=\textwidth, max totalheight=0.32\textheight}
+      \begin{tikzpicture}[node distance=8mm and 9mm]
+        \node[box,fill=fill1] (muse) {Muse};
+        \node[box,fill=fill2,right=of muse] (sig) {Signal\\\footnotesize processing};
+        \node[box,fill=fill3,right=of sig] (sm) {State\\\footnotesize machine};
+        \node[box,fill=fill4,right=of sm] (dnd) {DND\\\footnotesize suppression};
+        \node[box,fill=fill1,right=of dnd] (notif) {Catch-up\\\footnotesize summary};
+ 
+        \draw[flow] (muse) -- (sig);
+        \draw[flow] (sig) -- (sm);
+        \draw[flow] (sm) -- (dnd);
+        \draw[flow] (dnd) -- (notif);
+ 
+        \node[box,fill=fill2,below=10mm of sm] (cal) {Calibration};
+        \draw[flow] (cal) -- node[lbl,right]{thresholds} (sm);
+      \end{tikzpicture}
+    \end{adjustbox}
+  \end{center}
+ 
+  \small
+  \begin{itemize}
+    \item Runs entirely on-device, with no data leaves the phone
+    \item One state drives both suppression and the catch up summary
+    \item Fail open at every stage, a bad signal never silently holds a notification
+  \end{itemize}
+ 
+  \note{
+    - EEG in, one focus state out, everything downstream reacts to that single signal consistently\\
+    - Walk the pipeline left to right: BLE from the headset -> signal processing (artifact rejection + rolling normalisation) -> focus index -> state machine -> FOCUSED / NOT_FOCUSED\\
+    - That state is what both DND suppression and the catch-up summary key off\\
+    - Calibration is NOT part of the live loop -- one-time per-user step, shown underneath, fits the thresholds the state machine uses\\
+    - Thresholds stored as z-scores not raw numbers, because raw EEG power drifts with electrode placement, hair, even caffeine\\
+    - Three closing points: runs entirely on-device at ~1\,Hz, no data leaves the phone; one state drives both suppression and the summary, no separate logic path; fail-open runs through every stage -- bad or missing signal always means "let notifications through", never "hold them"
+  }
 \end{frame}
+ 
+\begin{frame}{Connecting to the headset}
+  A standalone BLE peripheral, not a paired Wear OS watch, so we use Muse's
+SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
+ 
+  \begin{center}
+    \begin{adjustbox}{max width=\textwidth, max totalheight=0.28\textheight}
+      \begin{tikzpicture}[node distance=8mm and 10mm]
+        \node[box,fill=fill1] (muse) {Muse 2};
+        \node[box,fill=fill2,right=of muse] (sdk) {LibMuse SDK};
+        \node[box,fill=fill3,right=of sdk] (impl) {Adapter};
+        \node[box,fill=fill4,right=of impl] (pipe) {Signal pipeline};
+ 
+        \draw[flow] (muse) -- node[lbl,above]{BLE} (sdk);
+        \draw[flow] (sdk) -- node[lbl,above]{callbacks} (impl);
+        \draw[flow] (impl) -- (pipe);
+      \end{tikzpicture}
+    \end{adjustbox}
+  \end{center}
+ 
+  \small
+  \begin{itemize}
+    \item Registers only the packet types needed, nothing Muse specific leaks out
+    \item Small connection state machine, rescans automatically on a drop
+    \item A dropped or poor contact signal reads as unknown, never silently nothing
+  \end{itemize}
+ 
+  \note{
+    - Specifically how we talk to the device, following on from the pipeline overview\\
+    - Muse is a standalone BLE peripheral, not a paired Wear OS watch -- that's why vendor SDK (LibMuse) over the Data Layer API\\
+    - Our adapter registers only the specific packet types the pipeline needs -- nothing Muse-specific leaks out past that boundary, everything above just sees our own signal pipeline\\
+    - Small connection state machine underneath handles rescanning automatically on a BLE drop\\
+    - Ties back to fail-open from slide one -- a dropped or poor-contact signal reads as unknown, same as any other bad-signal case, never silently nothing
+  }
+\end{frame}
+ 
+\begin{frame}[fragile]{Built as four independent modules}
+  The pipeline's own stages became the team's module boundaries — one
+  interface per stage, one owner, developed and tested in isolation.
+ 
+  \begin{center}
+    \begin{adjustbox}{max width=\textwidth, max totalheight=0.3\textheight}
+      \begin{tikzpicture}[node distance=8mm and 9mm]
+        \node[box,fill=fill1] (eeg) {Sensing};
+        \node[box,fill=fill2,right=of eeg] (engine) {Signal \&\\\footnotesize calibration};
+        \node[box,fill=fill3,right=of engine] (supp) {Notifications};
+        \node[box,fill=fill4,right=of supp] (ui) {UI \& stats};
+ 
+        \draw[flow] (eeg) -- (engine);
+        \draw[flow] (engine) -- (supp);
+        \draw[flow] (supp) -- (ui);
+        \draw[back] (engine) -- (ui);
+        \draw[back] (supp) -- (ui);
+      \end{tikzpicture}
+    \end{adjustbox}
+  \end{center}
+ 
+  \small
+  \begin{itemize}
+    \item Every interface has access to a fake demo, so all four people started building day one
+    \item An OSC bridge to an existing app gave real EEG data before BLE worked
+    \item Swapping any module is a one line change, nothing downstream changes
+  \end{itemize}
+  \note{
+    - One more thing worth mentioning since we're a four person team, the pipeline just shown is also how we split the work\\
+    - Sensing, signal and calibration, notifications, UI and stats, four pipeline stages, four independent modules, one person per stage\\
+    - What made it work on a fixed timeline, every interface had a fake from day one, so nobody blocked on anybody else\\
+    - Went further on hardware specifically, bridged an existing EEG streaming app over OSC early on, real EEG data to build and test signal processing against BEFORE our own Bluetooth integration worked\\
+    - Swapping any module is a one line change, nothing downstream changes
+  }
+\end{frame}
+
 
 % =============================================================================
 \section{Data processing}
