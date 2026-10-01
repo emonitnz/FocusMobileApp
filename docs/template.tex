@@ -218,9 +218,71 @@ docker run --rm -it alpine sh
 \end{frame}
 
 % =============================================================================
+
 \section{Application and its Purpose}
 
 \begin{frame}{Application and its Purpose}
+
+\begin{columns}[T]
+
+    % ---------------- TEXT ----------------
+    \begin{column}{0.43\textwidth}
+
+        \textbf{Chosen Device}
+
+        \vspace{0.15cm}
+
+        \textbf{Muse 2 EEG Headset}
+
+        \vspace{0.15cm}
+
+        Provides EEG data that our Android application uses
+        to estimate the user's focus state.
+
+        \vspace{0.35cm}
+
+        \textbf{What does our application do?}
+
+        \vspace{0.15cm}
+
+        \begin{itemize}
+            \item Estimates whether the user is focused using EEG data.
+            \item Temporarily suppresses incoming notifications while focused.
+            \item Stores notifications during the focused period.
+            \item Delivers one catch-up summary when focus ends.
+        \end{itemize}
+
+        \vspace{0.25cm}
+
+        \textbf{Who is it useful for?}
+
+        \vspace{0.15cm}
+
+        Students, people working, and anyone who needs
+        uninterrupted concentration.
+
+        \vspace{0.2cm}
+
+        \textbf{Purpose:} Reduce interruptions without making
+        users miss their notifications.
+
+    \end{column}
+
+    % ---------------- IMAGE ----------------
+    \begin{column}{0.55\textwidth}
+
+        \begin{center}
+            \includegraphics[
+                width=\textwidth,
+                height=0.72\textheight,
+                keepaspectratio
+            ]{COMPX551Project.png}
+        \end{center}
+
+    \end{column}
+
+\end{columns}
+
 \end{frame}
 
 % =============================================================================
