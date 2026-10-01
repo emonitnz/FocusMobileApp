@@ -184,6 +184,7 @@ data class DeferredNotification(
     val title: String,
     val postedAtMs: Long,
     val breakthrough: Boolean = false,
+    val category: String? = null,
 )
 
 /** Why the queue was released. Recorded so the stats screen can distinguish the safety valves. */

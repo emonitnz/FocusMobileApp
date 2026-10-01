@@ -20,7 +20,8 @@ class FocusNotificationListener : NotificationListenerService() {
             title = sbn.notification.extras
                 .getString("android.title")
                 ?: "",
-            postedAtMs = System.currentTimeMillis()
+            postedAtMs = System.currentTimeMillis(),
+            category = sbn.notification.category
         )
 
         // Useful for checking that Android is sending notifications to us.
@@ -29,7 +30,7 @@ class FocusNotificationListener : NotificationListenerService() {
             "Notification received from: ${sbn.packageName}"
         )
 
-        // Pass the notification to C so it can decide whether to defer it.
+        // Pass the notification to deferral queue so it can decide whether to defer it.
         notificationController.handleNotification(notification)
     }
 }
