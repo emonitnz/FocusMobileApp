@@ -60,6 +60,8 @@ class MuseEegSource(
 
     private val lock = Any()
     private var live = LiveBands()
+    /** Last raw value LibMuse sent per band packet type, to tell fresh values from held ones. */
+    private val lastRaw = HashMap<MuseDataPacketType, List<Float>>()
     private var lastAccel: Triple<Double, Double, Double>? = null
     private var lastPacketAtMs = 0L
     private var blinkSinceLastTick = false
@@ -85,6 +87,9 @@ class MuseEegSource(
         manager.stopListening()
         manager.startListening()
         Log.d(TAG, "startListening() called, waiting for museListChanged()")
+        // LibMuse only fires museListChanged() for headbands it has never seen; one already in its
+        // list from an earlier session is silently "rediscovered", so check the list ourselves.
+        connectToAvailableMuse()
     }
 
     private fun rescanAfterDrop(reason: String, delayMs: Long) {
@@ -119,24 +124,31 @@ class MuseEegSource(
     }
 
     private val museListener = object : MuseListener() {
-        override fun museListChanged() {
-            if (activeMuse != null || stopped) return
-            val found = manager.muses
-            Log.d(TAG, "museListChanged(): ${found.size} muse(s) found: ${found.map { it.name }}")
-            val candidate = if (preferredMac != null) {
-                found.firstOrNull { it.macAddress == preferredMac }
-            } else {
-                found.firstOrNull()
-            }
-            if (candidate != null) {
-                manager.stopListening()
-                connectTo(candidate)
-            }
+        override fun museListChanged() = connectToAvailableMuse()
+    }
+
+    @Synchronized
+    private fun connectToAvailableMuse() {
+        if (activeMuse != null || stopped) return
+        val found = manager.muses
+        Log.d(TAG, "muse list: ${found.size} muse(s) found: ${found.map { it.name }}")
+        val candidate = if (preferredMac != null) {
+            found.firstOrNull { it.macAddress == preferredMac }
+        } else {
+            found.firstOrNull()
+        }
+        if (candidate != null) {
+            manager.stopListening()
+            connectTo(candidate)
         }
     }
 
     private fun connectTo(muse: Muse) {
         activeMuse = muse
+        synchronized(lock) {
+            live = LiveBands()
+            lastRaw.clear()
+        }
         _status.value = DeviceStatus(DeviceState.CONNECTING, deviceName = muse.name)
 
         muse.unregisterAllListeners()
@@ -182,10 +194,10 @@ class MuseEegSource(
             synchronized(lock) {
                 lastPacketAtMs = System.currentTimeMillis()
                 when (p.packetType()) {
-                    MuseDataPacketType.ALPHA_RELATIVE -> live = live.copy(alpha = readFourChannels(p))
-                    MuseDataPacketType.BETA_RELATIVE -> live = live.copy(beta = readFourChannels(p))
-                    MuseDataPacketType.THETA_RELATIVE -> live = live.copy(theta = readFourChannels(p))
-                    MuseDataPacketType.GAMMA_RELATIVE -> live = live.copy(gamma = readFourChannels(p))
+                    MuseDataPacketType.ALPHA_RELATIVE -> live = live.copy(alpha = mergeFresh(p, live.alpha))
+                    MuseDataPacketType.BETA_RELATIVE -> live = live.copy(beta = mergeFresh(p, live.beta))
+                    MuseDataPacketType.THETA_RELATIVE -> live = live.copy(theta = mergeFresh(p, live.theta))
+                    MuseDataPacketType.GAMMA_RELATIVE -> live = live.copy(gamma = mergeFresh(p, live.gamma))
                     MuseDataPacketType.HSI_PRECISION -> live = live.copy(horseshoe = readFourChannels(p))
                     MuseDataPacketType.ACCELEROMETER -> handleAccel(p)
                     MuseDataPacketType.BATTERY -> handleBattery(p)
@@ -200,6 +212,18 @@ class MuseEegSource(
                 if (p.jawClench) jawClenchSinceLastTick = true
             }
         }
+    }
+
+    /**
+     * LibMuse repeats a channel's last clean band value while it rejects the current window
+     * (blinks, poor contact), and sends NaN until the first clean one. Keep only values that
+     * changed since the previous packet; channels with nothing fresh this tick stay NaN.
+     */
+    private fun mergeFresh(p: MuseDataPacket, pending: List<Float>): List<Float> {
+        val raw = readFourChannels(p)
+        val prev = lastRaw.put(p.packetType(), raw)
+        val base = if (pending.size == 4) pending else List(4) { Float.NaN }
+        return raw.mapIndexed { i, v -> if (!v.isNaN() && v != prev?.getOrNull(i)) v else base[i] }
     }
 
     private fun readFourChannels(p: MuseDataPacket): List<Float> = listOf(
@@ -253,6 +277,8 @@ class MuseEegSource(
             blinkSinceLastTick = false
             jawClenchSinceLastTick = false
             movementSinceLastTick = false
+            // Band values are per-tick: only what arrived fresh since the last epoch counts.
+            live = live.copy(alpha = emptyList(), beta = emptyList(), theta = emptyList(), gamma = emptyList())
             result
         }
 
@@ -287,13 +313,12 @@ class MuseEegSource(
             emgBroadband = emgLikeArtifact,
         )
 
-        val hasData = snapshot.bands.alpha.size == 4 && snapshot.bands.beta.size == 4
-        val valid = !flags.any && snapshot.contact.allGood && hasData
+        val valid = !flags.any && snapshot.contact.allGood && bandPowers.engagementIndex.isFinite()
 
         Log.d(
             TAG,
             "epoch: valid=$valid focusIndex=${bandPowers.engagementIndex} " +
-                    "artifacts=$flags contact=${snapshot.contact.asList}",
+                    "artifacts=$flags contact=${snapshot.contact.asList} bands=${snapshot.bands}",
         )
 
         _epochs.tryEmit(
@@ -323,12 +348,13 @@ class MuseEegSource(
         }
     }
 
+    /** Mean of the channels that have a value; NaN when none do. */
     private fun average(values: List<Float>): Double =
-        if (values.isEmpty()) 0.0 else values.map { it.toDouble() }.average()
+        values.filterNot { it.isNaN() }.map { it.toDouble() }.average()
 
     private fun averageOf(values: List<Float>, vararg indices: Int): Double {
-        if (values.size < 4) return 0.0
-        return indices.map { values[it].toDouble() }.average()
+        if (values.size < 4) return Double.NaN
+        return average(indices.map { values[it] })
     }
 
     private data class LiveBands(

@@ -5,8 +5,11 @@
     <!-- [Sprint 0] Declared up front so the four workloads never race on this file.
          Workload D's onboarding flow requests them; see DESIGN.md §5. -->
 
-    <!-- Muse headset over BLE (31+); ACCESS_FINE_LOCATION is the pre-31 equivalent for scanning. -->
+    <!-- Muse headset over BLE (31+); ACCESS_FINE_LOCATION is the pre-31 equivalent for scanning.
+         neverForLocation is required: without it Android 12+ silently drops every scan result
+         unless ACCESS_FINE_LOCATION is also granted, so LibMuse never sees the headband. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
         tools:targetApi="s" />

@@ -11,6 +11,7 @@ import com.example.compx551a4.core.Suppressor
 import com.example.compx551a4.data.SessionStore
 import com.example.compx551a4.data.UiPreferences
 import com.example.compx551a4.device.FakeEegSource
+import com.example.compx551a4.device.ForegroundEegSource
 import com.example.compx551a4.device.OscEegSource
 import com.example.compx551a4.device.MuseEegSource
 import com.example.compx551a4.service.FocusService
@@ -65,7 +66,8 @@ class AppContainer(context: Context) {
     //
     // Nothing in ui/ should need to change when they do.
 
-    val eegSource: EegSource = MuseEegSource(context)
+    // Wrapped so MainActivity can keep the headset connected whenever the app is open.
+    val eegSource = ForegroundEegSource(MuseEegSource(context))
 
     val focusEngine: FocusEngine = DemoFocusEngine()
 
