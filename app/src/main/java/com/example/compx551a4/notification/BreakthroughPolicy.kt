@@ -1,3 +1,12 @@
 package com.example.compx551a4.notification
 
-// [C] Calls, alarms, starred contacts, repeat callers, 2FA. Plus fail-open on any failure.
+import android.service.notification.StatusBarNotification
+
+/**
+ * decision maker to check which notification to hold and which one to allow even if DNDController will halt those notifications
+ * if a emergency call or emergency alert
+ * not required for this project
+ */
+class BreakthroughPolicy {
+    //for future use
+}
