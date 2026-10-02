@@ -10,6 +10,11 @@ import com.example.compx551a4.core.SessionRecorder
 import com.example.compx551a4.core.Suppressor
 import com.example.compx551a4.data.SessionStore
 import com.example.compx551a4.data.UiPreferences
+import com.example.compx551a4.device.FakeEegSource
+import com.example.compx551a4.device.OscEegSource
+import com.example.compx551a4.device.MuseEegSource
+import com.example.compx551a4.service.FocusService
+import com.example.compx551a4.service.AndroidServiceController
 import com.example.compx551a4.ui.preview.DemoEegSource
 import com.example.compx551a4.ui.preview.DemoFocusEngine
 import com.example.compx551a4.ui.preview.DemoNotificationPolicy
@@ -60,7 +65,7 @@ class AppContainer(context: Context) {
     //
     // Nothing in ui/ should need to change when they do.
 
-    val eegSource: EegSource = DemoEegSource(applicationScope)
+    val eegSource: EegSource = MuseEegSource(context)
 
     val focusEngine: FocusEngine = DemoFocusEngine()
 
@@ -68,11 +73,5 @@ class AppContainer(context: Context) {
 
     val notificationPolicy: NotificationPolicy = DemoNotificationPolicy()
 
-    val serviceController: ServiceController = DemoServiceController(
-        scope = applicationScope,
-        source = eegSource,
-        engine = focusEngine,
-        suppressor = suppressor,
-        recorder = sessionRecorder,
-    )
+    val serviceController: ServiceController = AndroidServiceController(context.applicationContext)
 }
