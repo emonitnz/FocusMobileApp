@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,12 +95,17 @@ class FocusService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null // not a bound service
 
-    private suspend fun runDecisionLoop() {
+    /**
+     * Every collector is a child of this coroutine (and so of [loopJob]), not a sibling on [scope]:
+     * cancelling [loopJob] in [onDestroy] must stop them, or a stopped session keeps feeding the
+     * app-wide engine and overwriting [appliedState] while the headset stays connected.
+     */
+    private suspend fun runDecisionLoop() = coroutineScope {
         deps.focusEngine.reset() // fresh dwell timers and rolling window for this session
         deps.sessionRecorder.onSessionStart(System.currentTimeMillis())
         startWithReconnectBackoff()
 
-        scope.launch {
+        launch {
             deps.eegSource.epochs.collect { epoch ->
                 deps.focusEngine.submit(epoch)
             }
@@ -114,7 +120,7 @@ class FocusService : Service() {
             .distinctUntilChanged()
             .mapLatest { usable -> if (usable) true else { delay(SIGNAL_GRACE_MS); false } }
 
-        scope.launch {
+        launch {
             combine(signalUsable, deps.focusEngine.state) { usable, state ->
                 if (usable) state else FocusState.UNKNOWN
             }.distinctUntilChanged().collect { effectiveState ->
@@ -135,7 +141,7 @@ class FocusService : Service() {
 
         // A headset that stays away is a session that is over: switch the master switch off rather
         // than sit in "No signal" indefinitely. The backoff reconnect keeps trying until then.
-        scope.launch {
+        launch {
             deps.eegSource.status
                 .map { it.usable }
                 .distinctUntilChanged()
@@ -149,20 +155,20 @@ class FocusService : Service() {
                 .collect()
         }
 
-        scope.launch {
+        launch {
             deps.focusEngine.decisions.collect { decision ->
                 deps.sessionRecorder.onDecision(decision)
             }
         }
     }
 
-    private suspend fun startWithReconnectBackoff() {
+    private suspend fun CoroutineScope.startWithReconnectBackoff() {
         deps.eegSource.start()
 
         var backoffMs = INITIAL_BACKOFF_MS
         var wasUsable = false
 
-        scope.launch {
+        launch {
             deps.eegSource.status.collect { status ->
                 if (status.usable) {
                     wasUsable = true
