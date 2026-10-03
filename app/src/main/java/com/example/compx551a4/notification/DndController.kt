@@ -2,108 +2,116 @@ package com.example.compx551a4.notification
 
 import android.app.AutomaticZenRule
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.service.notification.Condition
+import android.util.Log
+import com.example.compx551a4.MainActivity
+import com.example.compx551a4.core.PolicySettings
+
+// [C] AutomaticZenRule on/off, driven by the focus state.
+
+/** What [NotificationController] needs from the platform, so it can be tested without Android. */
+interface FocusModeGate {
+    /** Idempotent. Must never throw: without policy access it simply does nothing (fail open). */
+    fun setFocusMode(enabled: Boolean)
+
+    /** Re-applies the breakthrough allowlist to the rule. */
+    fun updatePolicy(settings: PolicySettings)
+}
 
 /**
- * this class will block the notification depanding on the focus state
+ * Owns the app's "Focus Mode" [AutomaticZenRule].
+ *
+ * The rule is registered lazily, on the first call that needs it, because the container is built
+ * before onboarding has granted notification-policy access. An existing rule from an earlier
+ * install is reused rather than duplicated, found by its condition id. Every platform call is
+ * guarded: if access is missing or revoked the rule is left alone and notifications are delivered
+ * normally, which is the fail-open behaviour DESIGN.md §3 requires.
  */
-class DndController(
-    private val context: Context//Context gives our class access to Android system services.
-) {
-   //NotificationManager is the Android system component that lets us work with notification-related settings, including the DND/Zen system.
-    private val notificationManager =
+class DndController(private val context: Context) : FocusModeGate {
+
+    private val notificationManager: NotificationManager? =
         context.getSystemService(NotificationManager::class.java)
-    private var ruleId: String? = null //When Android creates our DND rule, addAutomaticZenRule() gives us an ID for that rule. We need to remember that ID so later we can say: activate this rule or deactivate this rule
 
-    /**
-     * Creates and registers the Focus Mode Do Not Disturb rule with Android.
-     *
-     * This creates the rule once. It does not decide when Focus Mode starts
-     * or stops; setFocusMode() controls that later.
-     */
-    fun createRule() {
+    private var ruleId: String? = null
+    private var policy: PolicySettings = PolicySettings()
+    private var enabled = false
 
-        // Start building an Android AutomaticZenRule.
-        val rule = AutomaticZenRule.Builder(
+    private val hasAccess: Boolean
+        get() = notificationManager?.isNotificationPolicyAccessGranted == true
 
-            // The name Android will use for our DND rule.
-            "Focus Mode",
-
-            // A unique ID that identifies our Focus Mode condition.
-            Uri.parse("condition://com.example.compx551a4/focus")
+    @Synchronized
+    override fun setFocusMode(enabled: Boolean) {
+        val manager = notificationManager ?: return
+        if (!hasAccess) {
+            if (enabled) Log.w(TAG, "DND access not granted — focus mode not applied (fail open)")
+            this.enabled = false
+            return
+        }
+        val id = ensureRule(manager) ?: return
+        val condition = Condition(
+            CONDITION_ID,
+            RULE_NAME,
+            if (enabled) Condition.STATE_TRUE else Condition.STATE_FALSE,
+            Condition.SOURCE_CONTEXT,
         )
-
-            // Tell Android which activity can be opened to configure this rule.
-            // We use our app's MainActivity.
-            .setConfigurationActivity(
-                android.content.ComponentName(
-                    context,
-                    com.example.compx551a4.MainActivity::class.java
-                )
-            )
-
-            // Set what type of notification interruption is allowed
-            // when this DND rule is active.
-            // NONE means no notification interruptions.
-            .setInterruptionFilter(
-                NotificationManager.INTERRUPTION_FILTER_NONE
-            )
-
-            // Finish building the AutomaticZenRule object.
-            .build()
-
-        // Register the rule with Android's NotificationManager.
-        // Android returns a unique ID for the rule.
-        // We save that ID so we can activate/deactivate this rule later.
-        ruleId = notificationManager.addAutomaticZenRule(rule)
+        runCatching { manager.setAutomaticZenRuleState(id, condition) }
+            .onSuccess { this.enabled = enabled; Log.d(TAG, "focus mode -> $enabled") }
+            .onFailure { Log.w(TAG, "setAutomaticZenRuleState failed", it) }
     }
 
-    /**
-     * Turns Focus Mode ON or OFF.
-     *
-     * @param enabled true = Focus Mode ON
-     *                false = Focus Mode OFF
-     */
-    fun setFocusMode(enabled: Boolean) {
+    @Synchronized
+    override fun updatePolicy(settings: PolicySettings) {
+        policy = settings
+        val manager = notificationManager ?: return
+        if (!hasAccess) return
+        val id = ensureRule(manager) ?: return
+        runCatching { manager.updateAutomaticZenRule(id, buildRule()) }
+            .onFailure { Log.w(TAG, "updateAutomaticZenRule failed", it) }
+    }
 
-        // Get the ID of the DND rule we created earlier.
-        // If no rule has been created yet, stop here.
-        val id = ruleId ?: return
-
-        // Convert the Boolean into an Android Condition state.
-        // true  -> Focus Mode is active
-        // false -> Focus Mode is inactive
-        val state = if (enabled) {
-            Condition.STATE_TRUE
-        } else {
-            Condition.STATE_FALSE
+    /** Registers the rule if needed and returns its id, or null when the platform refused. */
+    private fun ensureRule(manager: NotificationManager): String? {
+        ruleId?.let { return it }
+        val existing = runCatching { manager.automaticZenRules }.getOrNull().orEmpty()
+            .entries.firstOrNull { it.value.conditionId == CONDITION_ID }
+        if (existing != null) {
+            ruleId = existing.key
+            return existing.key
         }
+        return runCatching { manager.addAutomaticZenRule(buildRule()) }
+            .onFailure { Log.w(TAG, "addAutomaticZenRule failed", it) }
+            .getOrNull()
+            ?.also { ruleId = it }
+    }
 
-        // Create a condition describing the current state of Focus Mode.
-        val condition = Condition(
+    private fun buildRule(): AutomaticZenRule {
+        val configuration = ComponentName(context, MainActivity::class.java)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            AutomaticZenRule.Builder(RULE_NAME, CONDITION_ID)
+                .setConfigurationActivity(configuration)
+                .setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                .setZenPolicy(BreakthroughPolicy.zenPolicyFor(policy))
+                .setEnabled(true)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            AutomaticZenRule(
+                RULE_NAME,
+                configuration,
+                CONDITION_ID,
+                NotificationManager.INTERRUPTION_FILTER_PRIORITY,
+                true,
+            )
+        }
+    }
 
-            // The unique ID of our Focus Mode condition.
-            Uri.parse("condition://com.example.compx551a4/focus"),
-
-            // A human-readable description of the condition.
-            "Focus Mode",
-
-            // The current state: active or inactive.
-            state,
-
-            // Tells Android that the state change is caused by a change in context,
-            // such as the app detecting that the user has entered or left Focus Mode.
-            Condition.SOURCE_CONTEXT
-        )
-
-        // Tell Android that the state of our DND rule has changed.
-        // If the condition is TRUE, Android activates the rule.
-        // If the condition is FALSE, Android deactivates the rule.
-        notificationManager.setAutomaticZenRuleState(
-            id,
-            condition
-        )
+    companion object {
+        private const val TAG = "DndController"
+        private const val RULE_NAME = "Focus Mode"
+        val CONDITION_ID: Uri = Uri.parse("condition://com.example.compx551a4/focus")
     }
 }

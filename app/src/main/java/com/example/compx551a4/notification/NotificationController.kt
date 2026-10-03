@@ -3,112 +3,127 @@ package com.example.compx551a4.notification
 import com.example.compx551a4.core.DeferredNotification
 import com.example.compx551a4.core.FlushReason
 import com.example.compx551a4.core.FocusState
+import com.example.compx551a4.core.NotificationPolicy
+import com.example.compx551a4.core.PolicySettings
+import com.example.compx551a4.core.SessionRecorder
 import com.example.compx551a4.core.Suppressor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+// [C] The Suppressor: focus state in, DND rule + deferral queue + catch-up summary out.
 
 /**
- * Controls notification suppression based on the focus state.
+ * Workload C's [Suppressor].
  *
- * When the user is focused, DND is enabled and incoming notifications
- * can be stored in the deferral queue.
+ * - FOCUSED turns the DND rule on. Everything the listener then sees is queued.
+ * - NOT_FOCUSED and UNKNOWN turn it off and release the queue as one summary (fail open —
+ *   DESIGN.md §3: anything short of confident focus delivers normally).
+ * - The max-hold valve releases the queue [PolicySettings.maxHoldMinutes] after the first
+ *   notification was held, even if focus continues, and the timer restarts with the next arrival.
  *
- * When the user is not focused, DND is disabled.
+ * The breakthrough allowlist is enforced by the platform through the rule's policy; notifications
+ * that match it are still recorded, flagged, so the summary and the stats tell them apart.
  */
 class NotificationController(
-    private val dndController: DndController,
-    private val deferralQueue: DeferralQueue
+    private val gate: FocusModeGate,
+    private val queue: DeferralQueue,
+    private val presenter: CatchUpPresenter,
+    private val recorder: SessionRecorder,
+    private val policy: NotificationPolicy,
+    private val scope: CoroutineScope,
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : Suppressor {
 
-    // Keeps track of the notifications currently waiting in the queue.
     private val _deferred = MutableStateFlow<List<DeferredNotification>>(emptyList())
+    override val deferred: StateFlow<List<DeferredNotification>> = _deferred.asStateFlow()
 
-    // Allows other parts of the app to observe the deferred notifications.
-    override val deferred: StateFlow<List<DeferredNotification>> =
-        _deferred.asStateFlow()
+    private val mutex = Mutex()
 
-    // Keeps track of the latest focus state received from FocusEngine.
+    @Volatile
     private var currentState = FocusState.UNKNOWN
 
+    private var maxHoldJob: Job? = null
+
     init {
-        // Register the Focus Mode DND rule with Android.
-        dndController.createRule()
+        scope.launch { policy.settings.collect { gate.updatePolicy(it) } }
     }
 
-    /**
-     * Applies the latest focus state to the notification system.
-     *
-     * FOCUSED -> DND ON
-     * NOT_FOCUSED -> DND OFF
-     * UNKNOWN -> DND OFF (fail open)
-     */
+    val isFocused: Boolean get() = currentState == FocusState.FOCUSED
+
     override suspend fun apply(state: FocusState) {
-
-        // Remember the latest state so incoming notifications
-        // know whether they should be deferred.
         currentState = state
-
         when (state) {
-
-            FocusState.FOCUSED -> {
-                // User is focused, so block notification interruptions.
-                dndController.setFocusMode(true)
-            }
-
-            FocusState.NOT_FOCUSED,
-            FocusState.UNKNOWN -> {
-                // User is not safely known to be focused,
-                // so allow notifications normally.
-                dndController.setFocusMode(false)
+            FocusState.FOCUSED -> gate.setFocusMode(true)
+            FocusState.NOT_FOCUSED, FocusState.UNKNOWN -> {
+                gate.setFocusMode(false)
+                if (!queue.isEmpty) flush(FlushReason.FOCUS_BROKE)
             }
         }
-
-        // Update the observable list after applying the state.
-        updateDeferredNotifications()
     }
 
-    /**
-     * Receives a notification from FocusNotificationListener.
-     *
-     * Notifications are only added to the queue while the user
-     * is currently focused.
-     */
+    /** Called by [FocusNotificationListener] for every notification it sees. */
     fun handleNotification(notification: DeferredNotification) {
-
-        if (currentState == FocusState.FOCUSED) {
-
-            // Store the notification in our queue.
-            deferralQueue.add(notification)
-
-            // Make the updated queue visible to the rest of the app.
-            updateDeferredNotifications()
+        if (!isFocused) return
+        val settings = policy.settings.value
+        val entry = notification.copy(breakthrough = BreakthroughPolicy.isBreakthrough(notification, settings))
+        scope.launch {
+            mutex.withLock {
+                val wasEmpty = queue.isEmpty
+                queue.add(entry)
+                publish()
+                if (wasEmpty) startMaxHold(settings.maxHoldMinutes)
+            }
+            recorder.onDeferred(entry)
         }
     }
 
-    /**
-     * Releases all deferred notifications when focus ends
-     * or another safety condition requires the queue to be flushed.
-     */
-    override suspend fun flush(reason: FlushReason) {
-
-        // Get the notifications that were being held.
-        val notifications = deferralQueue.getNotifications()
-
-        // TODO: Create the grouped catch-up summary here.
-        // For now, we simply clear the queue.
-
-        deferralQueue.clear()
-
-        // Tell observers that there are no deferred notifications left.
-        _deferred.value = emptyList()
+    /** The user dismissed it from the shade, so it is no longer waiting for them. */
+    fun handleRemoved(key: String) {
+        scope.launch {
+            mutex.withLock {
+                if (queue.remove(key)) {
+                    publish()
+                    if (queue.isEmpty) cancelMaxHold()
+                }
+            }
+        }
     }
 
-    /**
-     * Copies the current queue into the StateFlow so other parts
-     * of the app can observe the latest deferred notifications.
-     */
-    private fun updateDeferredNotifications() {
-        _deferred.value = deferralQueue.getNotifications()
+    override suspend fun flush(reason: FlushReason) {
+        val released = mutex.withLock {
+            cancelMaxHold()
+            val items = queue.getNotifications()
+            queue.clear()
+            publish()
+            items
+        }
+        if (released.isEmpty()) return
+        presenter.present(released, reason)
+        recorder.onFlush(released.size, reason, clock())
+    }
+
+    private fun publish() {
+        _deferred.value = queue.getNotifications()
+    }
+
+    private fun startMaxHold(minutes: Int) {
+        cancelMaxHold()
+        if (minutes <= 0) return
+        maxHoldJob = scope.launch {
+            delay(minutes * 60_000L)
+            flush(FlushReason.MAX_HOLD_EXCEEDED)
+        }
+    }
+
+    private fun cancelMaxHold() {
+        maxHoldJob?.cancel()
+        maxHoldJob = null
     }
 }

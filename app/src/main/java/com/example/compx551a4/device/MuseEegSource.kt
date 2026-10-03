@@ -1,7 +1,11 @@
 package com.example.compx551a4.device
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.choosemuse.libmuse.Accelerometer
 import com.choosemuse.libmuse.Battery
 import com.choosemuse.libmuse.ConnectionState
@@ -70,6 +74,12 @@ class MuseEegSource(
 
     override suspend fun start() {
         if (!stopped) return
+        if (!hasBluetoothPermission()) {
+            // Stay "stopped" so the next start() — after onboarding grants access — really scans.
+            Log.w(TAG, "Bluetooth permission not granted yet; not scanning")
+            _status.value = DeviceStatus.DISCONNECTED
+            return
+        }
         stopped = false
 
         manager.setContext(appContext)
@@ -80,6 +90,17 @@ class MuseEegSource(
 
         tickJob = scope.launch { tickLoop() }
         watchdogJob = scope.launch { watchdogLoop() }
+    }
+
+    private fun hasBluetoothPermission(): Boolean {
+        val needed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        return needed.all {
+            ContextCompat.checkSelfPermission(appContext, it) == PackageManager.PERMISSION_GRANTED
+        }
     }
 
     private fun beginScan() {

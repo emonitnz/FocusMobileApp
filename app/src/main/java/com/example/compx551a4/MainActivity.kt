@@ -24,9 +24,10 @@ class MainActivity : ComponentActivity() {
     }
 
     // Connect to the headset whenever the app is visible, so it is ready before calibration or a
-    // session starts and Home can show its live status.
-    override fun onStart() {
-        super.onStart()
+    // session starts and Home can show its live status. onResume rather than onStart: the runtime
+    // permission dialog only pauses the activity, and the first scan must happen after that grant.
+    override fun onResume() {
+        super.onResume()
         lifecycleScope.launch { container.eegSource.hold() }
     }
 

@@ -76,14 +76,20 @@ class FocusService : Service() {
         intentionalStop = true
         loopJob?.cancel()
         deps.eegSource.stop()
-        scope.launch { deps.sessionRecorder.onSessionEnd(System.currentTimeMillis()) }
         isRunning.value = false
+        // Fail open on the way out: DND off, queue released as one summary, session closed.
+        scope.launch {
+            deps.suppressor.apply(FocusState.UNKNOWN)
+            deps.suppressor.flush(FlushReason.SERVICE_STOPPED)
+            deps.sessionRecorder.onSessionEnd(System.currentTimeMillis())
+        }
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null // not a bound service
 
     private suspend fun runDecisionLoop() {
+        deps.focusEngine.reset() // fresh dwell timers and rolling window for this session
         deps.sessionRecorder.onSessionStart(System.currentTimeMillis())
         startWithReconnectBackoff()
 

@@ -1,34 +1,38 @@
 package com.example.compx551a4.notification
+
 import com.example.compx551a4.core.DeferredNotification
 
 // [C] Holds what arrived during focus, max-hold timer, grouped catch-up summary on break.
+
 /**
- * this is considered as memory that collects the blocked notification in a queue and remembered it
- * this is the queue that will hold all the notification(queue Manager)
+ * The notifications held back during the current focus period, oldest first.
+ *
+ * Keyed on the platform's notification key: an app that updates a notification replaces its
+ * entry rather than appearing twice in the catch-up summary. Safe to call from the listener's
+ * thread and the service's coroutine at once.
  */
 class DeferralQueue {
 
-    private val notifications = mutableListOf<DeferredNotification>()
+    private val byKey = LinkedHashMap<String, DeferredNotification>()
 
-    /**
-     * this function adds notification in list
-     */
+    @Synchronized
     fun add(notification: DeferredNotification) {
-        notifications.add(notification)
+        byKey.remove(notification.key)
+        byKey[notification.key] = notification
     }
 
-    /**
-     * this function returns all the notification
-     */
-    fun getNotifications(): List<DeferredNotification> {
-        return notifications.toList()
-    }
+    /** The user dismissed or the app cancelled it, so the summary should no longer mention it. */
+    @Synchronized
+    fun remove(key: String): Boolean = byKey.remove(key) != null
 
-    /**
-     * this function clears the queue when all notification has been returned
-     */
-    fun clear() {
-        notifications.clear()
-    }
+    @Synchronized
+    fun getNotifications(): List<DeferredNotification> = byKey.values.toList()
 
+    @Synchronized
+    fun clear() = byKey.clear()
+
+    val size: Int
+        @Synchronized get() = byKey.size
+
+    val isEmpty: Boolean get() = size == 0
 }

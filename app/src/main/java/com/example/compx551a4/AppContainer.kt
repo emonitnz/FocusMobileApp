@@ -8,22 +8,26 @@ import com.example.compx551a4.core.NotificationPolicy
 import com.example.compx551a4.core.ServiceController
 import com.example.compx551a4.core.SessionRecorder
 import com.example.compx551a4.core.Suppressor
+import com.example.compx551a4.data.NotificationSettings
 import com.example.compx551a4.data.SessionStore
+import com.example.compx551a4.data.ThresholdStore
 import com.example.compx551a4.data.UiPreferences
 import com.example.compx551a4.device.FakeEegSource
 import com.example.compx551a4.device.ForegroundEegSource
 import com.example.compx551a4.device.OscEegSource
 import com.example.compx551a4.device.MuseEegSource
+import com.example.compx551a4.device.SwitchableEegSource
+import com.example.compx551a4.notification.CatchUpNotifier
+import com.example.compx551a4.notification.DeferralQueue
+import com.example.compx551a4.notification.DndController
+import com.example.compx551a4.notification.NotificationController
+import com.example.compx551a4.signal.FocusPipeline
 import com.example.compx551a4.service.FocusService
 import com.example.compx551a4.service.AndroidServiceController
-import com.example.compx551a4.ui.preview.DemoEegSource
-import com.example.compx551a4.ui.preview.DemoFocusEngine
-import com.example.compx551a4.ui.preview.DemoNotificationPolicy
-import com.example.compx551a4.ui.preview.DemoServiceController
-import com.example.compx551a4.ui.preview.DemoSuppressor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.map
 
 // [SHARED] Application class + manual DI wiring the four modules together.
 //
@@ -54,26 +58,35 @@ class AppContainer(context: Context) {
     val sessionStore = SessionStore(context, applicationScope)
     val sessionRecorder: SessionRecorder = sessionStore
 
-    // --- SWAP POINT --------------------------------------------------------
-    // Everything below is a D-owned stand-in from ui/preview/DemoStack.kt so the app runs before
-    // workloads A, B and C land. Replace one line at a time as each real implementation arrives:
-    //
-    //   eegSource          -> MuseEegSource / OscEegSource / FakeEegSource   (A)
-    //   focusEngine        -> FocusPipeline + FocusStateMachine              (B)
-    //   suppressor         -> DndController + DeferralQueue                  (C)
-    //   notificationPolicy -> NotificationSettings                           (C)
-    //   serviceController  -> FocusService                                   (A)
-    //
-    // Nothing in ui/ should need to change when they do.
-
-    // Wrapped so MainActivity can keep the headset connected whenever the app is open.
-    val eegSource = ForegroundEegSource(MuseEegSource(context))
-
-    val focusEngine: FocusEngine = DemoFocusEngine()
-
-    val suppressor: Suppressor = DemoSuppressor(applicationScope, sessionRecorder)
-
-    val notificationPolicy: NotificationPolicy = DemoNotificationPolicy()
+    // --- Workload A ----------------------------------------------------------
+    // Wrapped so MainActivity can keep the headset connected whenever the app is open, and
+    // switchable to the synthetic source by the "Demo mode" developer option in Settings.
+    // OscEegSource (Mind Monitor) is a further drop-in alternative for development.
+    val eegSource = ForegroundEegSource(
+        SwitchableEegSource(
+            real = MuseEegSource(context),
+            fake = FakeEegSource(),
+            demoMode = uiPreferences.prefs.map { it.demoMode },
+            scope = applicationScope,
+        )
+    )
 
     val serviceController: ServiceController = AndroidServiceController(context.applicationContext)
+
+    // --- Workload B ----------------------------------------------------------
+    val thresholdStore = ThresholdStore(context)
+
+    val focusEngine: FocusEngine = FocusPipeline(store = thresholdStore, scope = applicationScope)
+
+    // --- Workload C ----------------------------------------------------------
+    val notificationPolicy: NotificationPolicy = NotificationSettings(context)
+
+    val suppressor: Suppressor = NotificationController(
+        gate = DndController(context),
+        queue = DeferralQueue(),
+        presenter = CatchUpNotifier(context),
+        recorder = sessionRecorder,
+        policy = notificationPolicy,
+        scope = applicationScope,
+    )
 }

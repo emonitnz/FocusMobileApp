@@ -256,13 +256,10 @@ private fun SettingsContent(
         }
 
         SectionCard(title = stringResource(R.string.settings_developer)) {
-            // Disabled rather than hidden: it marks the swap point in AppContainer, and a switch
-            // that silently does nothing is worse than one that says why it cannot.
             ToggleRow(
                 labelRes = R.string.settings_demo_mode,
-                checked = true,
+                checked = state.uiPrefs.demoMode,
                 bodyRes = R.string.settings_demo_mode_body,
-                enabled = false,
                 onChange = onDemoMode,
             )
             ToggleRow(

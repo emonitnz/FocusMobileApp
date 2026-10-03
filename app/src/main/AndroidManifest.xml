@@ -58,6 +58,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Configuration screen for the Focus Mode AutomaticZenRule (DndController). -->
+            <intent-filter>
+                <action android:name="android.app.action.AUTOMATIC_ZEN_RULE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.zen.automatic.ruleType"
+                android:value="Focus" />
+            <meta-data
+                android:name="android.service.zen.automatic.ruleInstanceLimit"
+                android:value="1" />
         </activity>
         <service
             android:name=".service.FocusService"

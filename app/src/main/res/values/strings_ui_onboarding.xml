@@ -128,8 +128,9 @@
     <string name="settings_recalibrate">Run calibration</string>
     <string name="settings_developer">Developer</string>
     <string name="settings_demo_mode">Demo mode</string>
-    <string name="settings_demo_mode_body">Always on for now: the headset, signal and notification
-        modules are not wired up yet, so everything runs on a synthetic signal.</string>
+    <string name="settings_demo_mode_body">Replace the headset with a synthetic signal so calibration,
+        sessions and notification holding can be tried without a Muse. Switching while connected
+        moves the connection across.</string>
     <string name="settings_fast_calibration">Fast calibration</string>
     <string name="settings_fast_calibration_body">Six-second blocks instead of sixty. Same nine
         blocks and the same phases, so the flow can be tested without sitting through it.</string>

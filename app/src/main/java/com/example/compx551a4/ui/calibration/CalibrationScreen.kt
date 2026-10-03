@@ -292,6 +292,21 @@ class CalibrationViewModel(
     }
 
     /**
+     * "Use these thresholds". A separable fit is applied by the engine itself; a poor one is left
+     * alone so the app fails open. The user has read the result and chosen to go ahead regardless,
+     * so apply exactly what the screen showed them.
+     */
+    fun accept(onDone: () -> Unit) {
+        val result = (_uiState.value.phase as? CalPhase.Done)?.result
+        viewModelScope.launch {
+            if (result != null && focusEngine.thresholds.value != result.thresholds) {
+                focusEngine.updateThresholds(result.thresholds)
+            }
+            onDone()
+        }
+    }
+
+    /**
      * Holds the protocol until the headset is worn properly. Nine minutes of unusable data is a far
      * worse outcome than a pause here, and this is the only moment the user can act on it without
      * disturbing a block in progress.
@@ -327,7 +342,7 @@ class CalibrationViewModel(
         private const val REST_MS = 8_000L
 
         // Developer option: same protocol, same phases, a tenth of the wall clock.
-        private const val FAST_BLOCK_MS = 6_000L
+        const val FAST_BLOCK_MS = 6_000L
         private const val FAST_BASELINE_MS = 4_000L
         private const val FAST_REST_MS = 1_500L
 
@@ -367,7 +382,7 @@ fun CalibrationScreen(
         onAbort = { viewModel.abort(); onDone() },
         onScore = viewModel::reportScore,
         onAnswer = viewModel::answerQuestion,
-        onAccept = onDone,
+        onAccept = { viewModel.accept(onDone) },
         onRedo = viewModel::start,
         modifier = modifier,
     )
@@ -488,7 +503,13 @@ private fun TaskPhase(
                 CalibrationCondition.LOW -> FixationTask()
                 CalibrationCondition.MEDIUM -> ReadingTask(READING_PASSAGES[phase.passageIndex])
                 CalibrationCondition.HIGH -> when (state.highDemandTask) {
-                    HighDemandTask.N_BACK -> NBackTask(onScore = onScore, seed = phase.seed)
+                    // Fast mode shortens the block tenfold; the 2-back has to speed up with it or a
+                    // six-second block ends before a single item can be scored.
+                    HighDemandTask.N_BACK -> NBackTask(
+                        onScore = onScore,
+                        seed = phase.seed,
+                        itemMs = if (phase.totalMs <= CalibrationViewModel.FAST_BLOCK_MS) FAST_NBACK_ITEM_MS else 2_000L,
+                    )
                     HighDemandTask.SERIAL_SUBTRACTION ->
                         SerialSubtractionTask(onScore = onScore, seed = phase.seed)
                 }
@@ -663,6 +684,9 @@ private fun formatAccuracy(scores: List<TaskScore>): String {
     if (total == 0) return "–"
     return formatPercent(scores.sumOf { it.correct }.toDouble() / total)
 }
+
+/** Ten items in a six-second block: enough to score eight of them. */
+private const val FAST_NBACK_ITEM_MS = 600L
 
 private fun CalibrationCondition.instructionRes(highTask: HighDemandTask): Int = when (this) {
     CalibrationCondition.LOW -> R.string.cal_task_fixation
