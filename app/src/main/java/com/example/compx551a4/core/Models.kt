@@ -171,6 +171,12 @@ data class CalibrationResult(
     val blocks: List<CalibrationBlock>,
     val lowMeanZ: Double,
     val highMeanZ: Double,
+    /**
+     * False when too few clean epochs survived artifact rejection to fit anything, in which case
+     * [thresholds] are simply the ones already in use and [auc] is chance. The result screen must
+     * say "not enough data", not "poor separation": the two call for different actions.
+     */
+    val fitted: Boolean = true,
 )
 
 // ---------------------------------------------------------------------------
@@ -203,7 +209,6 @@ data class PolicySettings(
     val allowAlarms: Boolean = true,
     val allowRepeatCallers: Boolean = true,
     val allowStarredContacts: Boolean = true,
-    val allowTwoFactorCodes: Boolean = true,
     val allowedPackages: Set<String> = emptySet(),
 )
 

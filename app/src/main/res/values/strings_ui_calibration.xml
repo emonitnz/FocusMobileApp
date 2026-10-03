@@ -42,6 +42,11 @@
     <string name="cal_fitting">Working out your thresholds…</string>
 
     <string name="cal_result_title">Calibration complete</string>
+    <string name="cal_result_title_insufficient">Not enough clean data</string>
+    <string name="cal_result_insufficient">Too few usable readings survived to fit anything — blinks,
+        poor contact or muscle noise rejected most of the recording. Nothing was changed. Check that
+        all four sensors show green on the Focus screen, then run it again.</string>
+    <string name="cal_result_keep_current">Keep current thresholds</string>
     <string name="cal_result_auc">Separation (AUC)</string>
     <string name="cal_result_auc_good">Clear separation between low and high demand. Good signal.</string>
     <string name="cal_result_auc_fair">Some separation, but weak. The app will work, less reliably.</string>

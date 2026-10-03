@@ -635,37 +635,55 @@ private fun ResultPhase(
         modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.cal_result_title), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(if (result.fitted) R.string.cal_result_title else R.string.cal_result_title_insufficient),
+            style = MaterialTheme.typography.headlineSmall,
+        )
 
         SectionCard(title = stringResource(R.string.cal_result_auc)) {
-            Text(
-                formatDecimal(result.auc),
-                fontSize = 40.sp,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            // DESIGN.md §7: poor separability for some users is a legitimate finding about consumer
-            // EEG, not a failure. The copy says so rather than implying the user did it wrong.
-            Text(
-                stringResource(
-                    when {
-                        result.auc >= 0.75 -> R.string.cal_result_auc_good
-                        result.auc >= 0.60 -> R.string.cal_result_auc_fair
-                        else -> R.string.cal_result_auc_poor
-                    },
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SeparationBar(lowMeanZ = result.lowMeanZ, highMeanZ = result.highMeanZ)
-            Text(
-                stringResource(
-                    R.string.cal_result_means,
-                    formatDecimal(result.lowMeanZ),
-                    formatDecimal(result.highMeanZ),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (result.fitted) {
+                Text(
+                    formatDecimal(result.auc),
+                    fontSize = 40.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                // DESIGN.md §7: poor separability for some users is a legitimate finding about consumer
+                // EEG, not a failure. The copy says so rather than implying the user did it wrong.
+                Text(
+                    stringResource(
+                        when {
+                            result.auc >= 0.75 -> R.string.cal_result_auc_good
+                            result.auc >= 0.60 -> R.string.cal_result_auc_fair
+                            else -> R.string.cal_result_auc_poor
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SeparationBar(lowMeanZ = result.lowMeanZ, highMeanZ = result.highMeanZ)
+                Text(
+                    stringResource(
+                        R.string.cal_result_means,
+                        formatDecimal(result.lowMeanZ),
+                        formatDecimal(result.highMeanZ),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                // No fit happened, so no number: a "0.50" here would read as a measured chance
+                // result when nothing was measured at all.
+                Text(
+                    "—",
+                    fontSize = 40.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(R.string.cal_result_insufficient),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 stringResource(
                     R.string.cal_result_thresholds,
@@ -691,11 +709,22 @@ private fun ResultPhase(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.cal_result_accept))
-        }
-        OutlinedButton(onClick = onRedo, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.cal_result_redo))
+        if (result.fitted) {
+            Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_result_accept))
+            }
+            OutlinedButton(onClick = onRedo, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_result_redo))
+            }
+        } else {
+            // Running again is the right action, so it gets the primary button; keeping what is
+            // already in use (or the placeholder) is the escape hatch.
+            Button(onClick = onRedo, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_result_redo))
+            }
+            OutlinedButton(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.cal_result_keep_current))
+            }
         }
     }
 }

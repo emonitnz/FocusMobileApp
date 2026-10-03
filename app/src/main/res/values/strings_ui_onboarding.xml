@@ -121,22 +121,14 @@
     <string name="settings_allow_alarms">Alarms</string>
     <string name="settings_allow_repeat">Repeat callers</string>
     <string name="settings_allow_starred">Starred contacts</string>
-    <string name="settings_allow_2fa">Verification codes</string>
     <string name="settings_calibration">Calibration</string>
     <string name="settings_calibration_never">Not calibrated yet</string>
     <string name="settings_calibration_done">Calibrated %1$s · separation %2$s</string>
     <string name="settings_recalibrate">Run calibration</string>
     <string name="settings_developer">Developer</string>
-    <string name="settings_demo_mode">Demo mode</string>
-    <string name="settings_demo_mode_body">Replace the headset with a synthetic signal so calibration,
-        sessions and notification holding can be tried without a Muse. Switching while connected
-        moves the connection across.</string>
     <string name="settings_fast_calibration">Fast calibration</string>
     <string name="settings_fast_calibration_body">Six-second blocks instead of sixty. Same nine
         blocks and the same phases, so the flow can be tested without sitting through it.</string>
-    <string name="settings_raw_logging">Log raw EEG</string>
-    <string name="settings_raw_logging_body">For offline analysis. Off by default — it writes a lot
-        of data.</string>
     <string name="settings_high_task">High-demand task</string>
     <string name="settings_task_nback">2-back</string>
     <string name="settings_task_subtraction">Serial subtraction</string>

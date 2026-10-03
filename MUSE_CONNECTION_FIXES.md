@@ -4,7 +4,7 @@ Summary of the changes made to get the Muse 2 headset (`Muse-3973`) detected, co
 producing usable focus readings. Verified on a Samsung phone running Android 12 (API 31) with
 LibMuse 8.0.9.
 
-All changes are uncommitted on branch `a-sensing-service`.
+Merged into `main` through PR #5 (`fixed-muse-connectivity`, commit `a44e695`).
 
 ## Files changed
 

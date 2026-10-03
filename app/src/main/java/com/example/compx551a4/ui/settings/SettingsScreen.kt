@@ -91,13 +91,7 @@ class SettingsViewModel(
         viewModelScope.launch { notificationPolicy.update(policy) }
     }
 
-    fun setDemoMode(enabled: Boolean) {
-        viewModelScope.launch { uiPreferences.setDemoMode(enabled) }
-    }
 
-    fun setRawLogging(enabled: Boolean) {
-        viewModelScope.launch { uiPreferences.setRawLogging(enabled) }
-    }
 
     fun setHighDemandTask(task: HighDemandTask) {
         viewModelScope.launch { uiPreferences.setHighDemandTask(task) }
@@ -143,8 +137,6 @@ fun SettingsScreen(
         onExitDwell = viewModel::setExitDwell,
         onEntryDwell = viewModel::setEntryDwell,
         onPolicy = viewModel::updatePolicy,
-        onDemoMode = viewModel::setDemoMode,
-        onRawLogging = viewModel::setRawLogging,
         onFastCalibration = viewModel::setFastCalibration,
         onHighTask = viewModel::setHighDemandTask,
         onLoadPlaceholder = viewModel::loadPlaceholderThresholds,
@@ -161,8 +153,6 @@ private fun SettingsContent(
     onExitDwell: (Int) -> Unit,
     onEntryDwell: (Int) -> Unit,
     onPolicy: (PolicySettings) -> Unit,
-    onDemoMode: (Boolean) -> Unit,
-    onRawLogging: (Boolean) -> Unit,
     onFastCalibration: (Boolean) -> Unit,
     onHighTask: (HighDemandTask) -> Unit,
     onLoadPlaceholder: () -> Unit,
@@ -231,9 +221,6 @@ private fun SettingsContent(
             ToggleRow(R.string.settings_allow_starred, state.policy.allowStarredContacts) {
                 onPolicy(state.policy.copy(allowStarredContacts = it))
             }
-            ToggleRow(R.string.settings_allow_2fa, state.policy.allowTwoFactorCodes) {
-                onPolicy(state.policy.copy(allowTwoFactorCodes = it))
-            }
         }
 
         SectionCard(title = stringResource(R.string.settings_calibration)) {
@@ -257,22 +244,10 @@ private fun SettingsContent(
 
         SectionCard(title = stringResource(R.string.settings_developer)) {
             ToggleRow(
-                labelRes = R.string.settings_demo_mode,
-                checked = state.uiPrefs.demoMode,
-                bodyRes = R.string.settings_demo_mode_body,
-                onChange = onDemoMode,
-            )
-            ToggleRow(
                 labelRes = R.string.settings_fast_calibration,
                 checked = state.uiPrefs.fastCalibration,
                 bodyRes = R.string.settings_fast_calibration_body,
                 onChange = onFastCalibration,
-            )
-            ToggleRow(
-                labelRes = R.string.settings_raw_logging,
-                checked = state.uiPrefs.rawLoggingEnabled,
-                bodyRes = R.string.settings_raw_logging_body,
-                onChange = onRawLogging,
             )
 
             Text(stringResource(R.string.settings_high_task), style = MaterialTheme.typography.titleSmall)
@@ -375,7 +350,7 @@ private fun SettingsPreview() {
     COMPX551A4Theme {
         SettingsContent(
             state = SettingsUiState(thresholds = FocusThresholds.PLACEHOLDER.copy(auc = 0.78)),
-            onExitDwell = {}, onEntryDwell = {}, onPolicy = {}, onDemoMode = {}, onRawLogging = {},
+            onExitDwell = {}, onEntryDwell = {}, onPolicy = {},
             onFastCalibration = {}, onHighTask = {}, onLoadPlaceholder = {}, onClearHistory = {},
             onCalibrate = {}, onReRunOnboarding = {},
         )

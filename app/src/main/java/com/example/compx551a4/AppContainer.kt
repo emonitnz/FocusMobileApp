@@ -16,7 +16,6 @@ import com.example.compx551a4.device.FakeEegSource
 import com.example.compx551a4.device.ForegroundEegSource
 import com.example.compx551a4.device.OscEegSource
 import com.example.compx551a4.device.MuseEegSource
-import com.example.compx551a4.device.SwitchableEegSource
 import com.example.compx551a4.notification.CatchUpNotifier
 import com.example.compx551a4.notification.DeferralQueue
 import com.example.compx551a4.notification.DndController
@@ -27,7 +26,6 @@ import com.example.compx551a4.service.AndroidServiceController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.map
 
 // [SHARED] Application class + manual DI wiring the four modules together.
 //
@@ -59,17 +57,9 @@ class AppContainer(context: Context) {
     val sessionRecorder: SessionRecorder = sessionStore
 
     // --- Workload A ----------------------------------------------------------
-    // Wrapped so MainActivity can keep the headset connected whenever the app is open, and
-    // switchable to the synthetic source by the "Demo mode" developer option in Settings.
-    // OscEegSource (Mind Monitor) is a further drop-in alternative for development.
-    val eegSource = ForegroundEegSource(
-        SwitchableEegSource(
-            real = MuseEegSource(context),
-            fake = FakeEegSource(),
-            demoMode = uiPreferences.prefs.map { it.demoMode },
-            scope = applicationScope,
-        )
-    )
+    // Wrapped so MainActivity can keep the headset connected whenever the app is open.
+    // OscEegSource (Mind Monitor) and FakeEegSource are drop-in alternatives for development.
+    val eegSource = ForegroundEegSource(MuseEegSource(context))
 
     val serviceController: ServiceController = AndroidServiceController(context.applicationContext)
 

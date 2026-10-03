@@ -185,6 +185,7 @@ class FocusPipeline(
                 blocks = blocks,
                 lowMeanZ = 0.0,
                 highMeanZ = 0.0,
+                fitted = false,
             )
             is FitOutcome.Fitted -> {
                 val record = CalibrationRecord(
