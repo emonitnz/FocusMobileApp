@@ -33,6 +33,9 @@ import kotlin.random.Random
 private const val N = 2
 private val LETTERS = listOf('B', 'D', 'F', 'H', 'K', 'M', 'Q', 'R', 'T')
 
+/** 1.5 s per letter: brisk enough to demand attention, still comfortably readable. */
+const val DEFAULT_ITEM_MS = 1_500L
+
 /** Roughly this proportion of items are deliberately made matches; the rest are random. */
 private const val TARGET_MATCH_RATE = 0.30
 
@@ -73,10 +76,14 @@ internal class NBackState(private val random: Random) {
             }
         }
 
+        // Never the same letter twice in a row: a repeat reads as a glitch rather than a new item,
+        // and makes the user doubt whether the display advanced. A match is still possible (B D B),
+        // and the 2-back candidate can never be the predecessor because of this very rule.
+        val previous = history.lastOrNull()
         val next = if (history.size >= N && random.nextDouble() < TARGET_MATCH_RATE) {
             history[history.size - N]
         } else {
-            LETTERS.random(random)
+            LETTERS.filter { it != previous }.random(random)
         }
         history += next
         current = next
@@ -102,7 +109,7 @@ internal class NBackState(private val random: Random) {
 fun NBackTask(
     onScore: (TaskScore) -> Unit,
     modifier: Modifier = Modifier,
-    itemMs: Long = 2_000L,
+    itemMs: Long = DEFAULT_ITEM_MS,
     seed: Int = 0,
 ) {
     val state = remember(seed) { NBackState(Random(seed)) }

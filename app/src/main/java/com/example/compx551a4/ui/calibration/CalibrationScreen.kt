@@ -54,6 +54,7 @@ import com.example.compx551a4.core.FocusEpoch
 import com.example.compx551a4.core.TaskScore
 import com.example.compx551a4.data.HighDemandTask
 import com.example.compx551a4.data.UiPreferences
+import com.example.compx551a4.ui.calibration.tasks.DEFAULT_ITEM_MS
 import com.example.compx551a4.ui.calibration.tasks.FixationTask
 import com.example.compx551a4.ui.calibration.tasks.NBackTask
 import com.example.compx551a4.ui.calibration.tasks.READING_PASSAGES
@@ -152,6 +153,7 @@ class CalibrationViewModel(
     private var recording = false
     private var latestScore: TaskScore? = null
     private var answer: CompletableDeferred<Int?>? = null
+    private var skipBlock: CompletableDeferred<Unit>? = null
 
     private var status: LiveStatus = LiveStatus()
     private var run: Job? = null
@@ -191,6 +193,11 @@ class CalibrationViewModel(
 
     fun answerQuestion(index: Int?) {
         answer?.complete(index)
+    }
+
+    /** "Finished reading": ends the current reading block now rather than at the timer. */
+    fun finishBlockEarly() {
+        skipBlock?.complete(Unit)
     }
 
     private suspend fun runProtocol() {
@@ -239,11 +246,16 @@ class CalibrationViewModel(
             latestScore = null
             val startedAt = System.currentTimeMillis()
             val epochsBefore = epochsLock.withLock { epochs.size }
+            // Only reading can end early: a fixation or 2-back block that stops short is just less data.
+            val skip = if (condition == CalibrationCondition.MEDIUM) CompletableDeferred<Unit>() else null
+            skipBlock = skip
             recording = true
-            countdownPhase(blockMs) { remaining ->
+            countdownPhase(blockMs, skip) { remaining ->
                 CalPhase.Running(condition, remaining, blockMs, passageIndex, seed = completed)
             }
             recording = false
+            skipBlock = null
+            val durationMs = minOf(blockMs, System.currentTimeMillis() - startedAt)
 
             // Asked after recording stops: answering is a different task from reading, and its
             // epochs would be mislabelled as MEDIUM.
@@ -271,7 +283,7 @@ class CalibrationViewModel(
                 blocks += CalibrationBlock(
                     condition = condition,
                     startedAtMs = startedAt,
-                    durationMs = blockMs,
+                    durationMs = durationMs,
                     taskScore = latestScore,
                 )
                 completed++
@@ -323,9 +335,14 @@ class CalibrationViewModel(
         }
     }
 
-    private suspend fun countdownPhase(totalMs: Long, phase: (Long) -> CalPhase) {
+    /** Ticks [phase] down to zero, or until [skip] completes if one is given. */
+    private suspend fun countdownPhase(
+        totalMs: Long,
+        skip: CompletableDeferred<Unit>? = null,
+        phase: (Long) -> CalPhase,
+    ) {
         var remaining = totalMs
-        while (remaining > 0) {
+        while (remaining > 0 && skip?.isCompleted != true) {
             _uiState.value = _uiState.value.copy(phase = phase(remaining))
             delay(TICK_MS)
             remaining -= TICK_MS
@@ -382,6 +399,7 @@ fun CalibrationScreen(
         onAbort = { viewModel.abort(); onDone() },
         onScore = viewModel::reportScore,
         onAnswer = viewModel::answerQuestion,
+        onFinishReading = viewModel::finishBlockEarly,
         onAccept = { viewModel.accept(onDone) },
         onRedo = viewModel::start,
         modifier = modifier,
@@ -430,6 +448,7 @@ private fun CalibrationContent(
     onAbort: () -> Unit,
     onScore: (TaskScore) -> Unit,
     onAnswer: (Int?) -> Unit,
+    onFinishReading: () -> Unit,
     onAccept: () -> Unit,
     onRedo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -445,7 +464,7 @@ private fun CalibrationContent(
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.background),
             ) {
-                TaskPhase(phase, state, onScore, Modifier.windowInsetsPadding(WindowInsets.safeDrawing))
+                TaskPhase(phase, state, onScore, onFinishReading, Modifier.windowInsetsPadding(WindowInsets.safeDrawing))
             }
         }
 
@@ -469,6 +488,7 @@ private fun TaskPhase(
     phase: CalPhase,
     state: CalibrationUiState,
     onScore: (TaskScore) -> Unit,
+    onFinishReading: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (phase) {
@@ -501,14 +521,17 @@ private fun TaskPhase(
         ) {
             when (phase.condition) {
                 CalibrationCondition.LOW -> FixationTask()
-                CalibrationCondition.MEDIUM -> ReadingTask(READING_PASSAGES[phase.passageIndex])
+                CalibrationCondition.MEDIUM -> ReadingTask(
+                    READING_PASSAGES[phase.passageIndex],
+                    onFinished = onFinishReading,
+                )
                 CalibrationCondition.HIGH -> when (state.highDemandTask) {
                     // Fast mode shortens the block tenfold; the 2-back has to speed up with it or a
                     // six-second block ends before a single item can be scored.
                     HighDemandTask.N_BACK -> NBackTask(
                         onScore = onScore,
                         seed = phase.seed,
-                        itemMs = if (phase.totalMs <= CalibrationViewModel.FAST_BLOCK_MS) FAST_NBACK_ITEM_MS else 2_000L,
+                        itemMs = if (phase.totalMs <= CalibrationViewModel.FAST_BLOCK_MS) FAST_NBACK_ITEM_MS else DEFAULT_ITEM_MS,
                     )
                     HighDemandTask.SERIAL_SUBTRACTION ->
                         SerialSubtractionTask(onScore = onScore, seed = phase.seed)

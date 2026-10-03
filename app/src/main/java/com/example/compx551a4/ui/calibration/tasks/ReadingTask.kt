@@ -10,6 +10,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -50,14 +51,30 @@ val READING_PASSAGES = listOf(
     ),
 )
 
+/**
+ * [onFinished] ends the block early. A fast reader who has finished the passage is no longer
+ * reading, just waiting, and the epochs from that wait would be labelled MEDIUM while the user
+ * drifts; better to stop recording the moment the reading stops.
+ */
 @Composable
-fun ReadingTask(passage: ReadingPassage, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(passage.textRes),
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-    )
+fun ReadingTask(
+    passage: ReadingPassage,
+    modifier: Modifier = Modifier,
+    onFinished: (() -> Unit)? = null,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = stringResource(passage.textRes),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
+        )
+        if (onFinished != null) {
+            TextButton(onClick = onFinished, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.cal_task_reading_done))
+            }
+        }
+    }
 }
 
 /**

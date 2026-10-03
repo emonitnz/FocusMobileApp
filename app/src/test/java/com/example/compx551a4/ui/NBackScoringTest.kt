@@ -2,6 +2,7 @@ package com.example.compx551a4.ui
 
 import com.example.compx551a4.ui.calibration.tasks.NBackState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import kotlin.random.Random
 
@@ -44,5 +45,14 @@ class NBackScoringTest {
     @Test
     fun `accuracy is zero when nothing has been scored`() {
         assertEquals(0.0, state().score().accuracy, 0.0)
+    }
+
+    @Test
+    fun `a letter never repeats its predecessor`() {
+        val s = state()
+        repeat(2_000) { s.advance(it.toLong()) }
+        s.history.zipWithNext().forEachIndexed { i, (a, b) ->
+            assertNotEquals("repeat at item $i", a, b)
+        }
     }
 }

@@ -28,7 +28,8 @@
 
 
     <string name="cal_task_fixation">Look at the dot. Let your mind wander.</string>
-    <string name="cal_task_reading">Read at a comfortable pace. There is a question afterwards.</string>
+    <string name="cal_task_reading">Read at a comfortable pace, then tap Finished. There is a question afterwards.</string>
+    <string name="cal_task_reading_done">Finished reading</string>
     <string name="cal_task_nback">Tap MATCH when the letter is the same as the one <i>two</i>
         letters ago.</string>
     <string name="cal_task_nback_button">MATCH</string>
