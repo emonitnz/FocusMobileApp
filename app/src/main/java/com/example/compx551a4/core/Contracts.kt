@@ -100,6 +100,13 @@ interface SessionRecorder {
 interface ServiceController {
     val running: StateFlow<Boolean>
 
+    /**
+     * The focus state the suppressor is actually applying, which is what the home screen shows.
+     * The engine's state while the signal is usable; [FocusState.UNKNOWN] once the signal has been
+     * lost for longer than a short grace period, and whenever the service is not running.
+     */
+    val appliedState: StateFlow<FocusState>
+
     fun start()
     fun stop()
 }

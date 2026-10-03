@@ -43,6 +43,20 @@ class FocusPipeline(
     initialThresholds: FocusThresholds? = null,
     private val store: ThresholdStore? = null,
     scope: CoroutineScope? = null,
+    /**
+     * Accepted epochs averaged before thresholding. 1 means none. The raw index at 1 Hz is noisy
+     * enough that a single dip resets the entry dwell, so a few seconds of averaging is what lets
+     * a genuinely focused stretch ever satisfy "sustained above T_high".
+     */
+    smoothingWindow: Int = 1,
+    /**
+     * Score against the calibration run's mean and SD when a fit is available, and only fall back
+     * to the rolling window without one. The thresholds were fitted on that distribution, and a
+     * rolling window re-centres on whatever the user has been doing, so a long focus period
+     * normalises itself away (SUMMARY_B.md, open question 1). The rolling window still runs
+     * underneath so the drift detector can ask for a recalibration when the signal moves.
+     */
+    private val useCalibrationReference: Boolean = true,
     private val rejector: ArtifactRejector = ArtifactRejector(),
     private val stateMachine: FocusStateMachine = FocusStateMachine(),
     private val normalizer: RollingZScore = RollingZScore(),
@@ -54,6 +68,8 @@ class FocusPipeline(
 
     /** [submit] runs on the service's collector while [reset] may come from the UI. */
     private val lock = Any()
+
+    private val smoother = MovingAverage(smoothingWindow)
 
     private val _state = MutableStateFlow(FocusState.UNKNOWN)
     override val state: StateFlow<FocusState> = _state.asStateFlow()
@@ -100,7 +116,13 @@ class FocusPipeline(
 
         if (rejector.check(epoch) != null) return decision(epoch, index, z = 0.0, accepted = false)
 
-        val z = normalizer.push(index)
+        val smoothed = smoother.push(index)
+        val reference = drift.reference.takeIf { useCalibrationReference && it != null && it.sd > MIN_REFERENCE_SD }
+        // The window always holds the raw index: it is what the drift detector compares against
+        // the calibration run, and smoothing would shrink its SD and look like drift.
+        val rollingZ = normalizer.score(smoothed)
+        normalizer.push(index)
+        val z = if (reference != null) (smoothed - reference.mean) / reference.sd else rollingZ
         val t = _thresholds.value
         if (z == null || t == null) return decision(epoch, index, z = z ?: 0.0, accepted = false)
 
@@ -130,6 +152,7 @@ class FocusPipeline(
             rejector.reset()
             stateMachine.reset()
             normalizer.reset()
+            smoother.reset()
             drift.reset()
             _state.value = FocusState.UNKNOWN
         }
@@ -193,6 +216,26 @@ class FocusPipeline(
     }
 }
 
+/** A calibration whose index barely varied cannot score anything; fall back to the window. */
+private const val MIN_REFERENCE_SD = 1e-9
+
+/** Mean of the last [windowSize] values pushed; the mean of what is there until it fills. */
+class MovingAverage(private val windowSize: Int) {
+    init {
+        require(windowSize >= 1) { "windowSize must be at least 1" }
+    }
+
+    private val window = ArrayDeque<Double>()
+
+    fun push(value: Double): Double {
+        window.addLast(value)
+        if (window.size > windowSize) window.removeFirst()
+        return window.average()
+    }
+
+    fun reset() = window.clear()
+}
+
 /**
  * Rolling z-score over the last [windowSize] values (default 10 min at ~1 Hz, DESIGN.md §1).
  *
@@ -227,18 +270,20 @@ class RollingZScore(
 
     /** Scores [value] against the current window, then adds it. */
     fun push(value: Double): Double? {
-        val z = if (window.size >= warmup) score(value) else null
+        val z = score(value)
         window.addLast(value)
         if (window.size > windowSize) window.removeFirst()
         return z
     }
 
-    fun reset() = window.clear()
-
-    private fun score(value: Double): Double {
+    /** Scores [value] against the current window without adding it; null until warmed up. */
+    fun score(value: Double): Double? {
+        if (window.size < warmup) return null
         val sd = sd
         return if (sd < MIN_SD) 0.0 else (value - mean) / sd
     }
+
+    fun reset() = window.clear()
 
     companion object {
         const val DEFAULT_WINDOW = 600

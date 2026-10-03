@@ -43,7 +43,9 @@ fun liveStatusFlow(
 ): Flow<LiveStatus> =
     combine(
         eegSource.status,
-        focusEngine.state,
+        // What is being applied, not the engine's raw state: the two differ while the signal is
+        // lost and whenever no session is running, and the pill must agree with the DND rule.
+        serviceController.appliedState,
         focusEngine.thresholds,
         focusEngine.recalibrationSuggested,
     ) { device, state, thresholds, recalibrate ->

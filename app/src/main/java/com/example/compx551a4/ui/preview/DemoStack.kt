@@ -430,6 +430,8 @@ class DemoServiceController(
     private val _running = MutableStateFlow(false)
     override val running: StateFlow<Boolean> = _running.asStateFlow()
 
+    override val appliedState: StateFlow<FocusState> = engine.state
+
     private var job: Job? = null
 
     override fun start() {

@@ -48,6 +48,7 @@ class HomeViewModelTest {
     private class FakeController : ServiceController {
         private val _running = MutableStateFlow(false)
         override val running: StateFlow<Boolean> = _running.asStateFlow()
+        override val appliedState: StateFlow<FocusState> = MutableStateFlow(FocusState.UNKNOWN)
         var startCalls = 0
         override fun start() { startCalls++; _running.value = true }
         override fun stop() { _running.value = false }

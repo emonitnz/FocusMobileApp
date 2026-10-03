@@ -45,6 +45,13 @@ fun FocusIndexChart(
     tHighZ: Double?,
     tLowZ: Double?,
     modifier: Modifier = Modifier,
+    /**
+     * How many points the x axis spans. The caller's buffer fills from empty after every screen
+     * re-creation; with the axis sized to the buffer's capacity rather than its current length,
+     * new points enter from the right at a steady one-per-second pace instead of the first few
+     * being stretched across the whole width and then squeezed up as the buffer fills.
+     */
+    capacity: Int = points.size,
     lineColor: Color = MaterialTheme.colorScheme.primary,
     bandColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
     guideColor: Color = MaterialTheme.colorScheme.outline,
@@ -69,7 +76,8 @@ fun FocusIndexChart(
         val values = points.filter { it.accepted }.map { it.normalizedZ }
         val extent = max(3.0, values.maxOfOrNull { abs(it) } ?: 3.0)
         fun yOf(z: Double) = (size.height * (1.0 - (z + extent) / (2 * extent))).toFloat()
-        fun xOf(i: Int) = size.width * i / (points.size - 1).toFloat()
+        val slots = max(capacity, points.size)
+        fun xOf(i: Int) = size.width * (slots - points.size + i) / (slots - 1).toFloat()
 
         if (tHighZ != null && tLowZ != null) {
             // The neutral zone: inside it, neither dwell timer runs. Shaded, not outlined, so it

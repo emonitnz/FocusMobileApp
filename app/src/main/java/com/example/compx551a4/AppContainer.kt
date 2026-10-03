@@ -76,7 +76,11 @@ class AppContainer(context: Context) {
     // --- Workload B ----------------------------------------------------------
     val thresholdStore = ThresholdStore(context)
 
-    val focusEngine: FocusEngine = FocusPipeline(store = thresholdStore, scope = applicationScope)
+    val focusEngine: FocusEngine = FocusPipeline(
+        store = thresholdStore,
+        scope = applicationScope,
+        smoothingWindow = FOCUS_SMOOTHING_EPOCHS,
+    )
 
     // --- Workload C ----------------------------------------------------------
     val notificationPolicy: NotificationPolicy = NotificationSettings(context)
@@ -89,4 +93,9 @@ class AppContainer(context: Context) {
         policy = notificationPolicy,
         scope = applicationScope,
     )
+
+    private companion object {
+        /** About eight seconds at ~1 Hz: enough to ride out single noisy epochs, well inside the dwells. */
+        const val FOCUS_SMOOTHING_EPOCHS = 8
+    }
 }

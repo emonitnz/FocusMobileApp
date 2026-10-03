@@ -306,6 +306,7 @@ private fun HomeContent(
             } else {
                 FocusIndexChart(
                     points = state.points,
+                    capacity = HomeViewModel.CHART_WINDOW,
                     tHighZ = state.tHighZ,
                     tLowZ = state.tLowZ,
                 )

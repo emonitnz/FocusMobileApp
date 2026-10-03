@@ -31,11 +31,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlin.math.min
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class FocusService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -77,6 +82,7 @@ class FocusService : Service() {
         loopJob?.cancel()
         deps.eegSource.stop()
         isRunning.value = false
+        appliedState.value = FocusState.UNKNOWN
         // Fail open on the way out: DND off, queue released as one summary, session closed.
         scope.launch {
             deps.suppressor.apply(FocusState.UNKNOWN)
@@ -99,31 +105,53 @@ class FocusService : Service() {
             }
         }
 
+        // Signal loss only counts once it has lasted SIGNAL_GRACE_MS: a BLE blip or one electrode
+        // reading 2 for a few seconds recovers on its own, and releasing the queue for it would be
+        // a worse interruption than the one being prevented. mapLatest drops the wait if the
+        // signal comes back first.
+        val signalUsable = deps.eegSource.status
+            .map { it.usable }
+            .distinctUntilChanged()
+            .mapLatest { usable -> if (usable) true else { delay(SIGNAL_GRACE_MS); false } }
+
         scope.launch {
-            combine(deps.eegSource.status, deps.focusEngine.state) { status, state ->
-                if (!status.usable) FocusState.UNKNOWN else state
+            combine(signalUsable, deps.focusEngine.state) { usable, state ->
+                if (usable) state else FocusState.UNKNOWN
             }.distinctUntilChanged().collect { effectiveState ->
+                if (effectiveState == FocusState.UNKNOWN) {
+                    // Fail open (DESIGN.md §3): release with the honest reason, then make the
+                    // engine re-establish focus from scratch when the signal returns rather than
+                    // resuming FOCUSED the instant the headset reconnects.
+                    if (deps.suppressor.deferred.value.isNotEmpty()) {
+                        deps.suppressor.flush(FlushReason.HEADSET_REMOVED)
+                    }
+                    deps.focusEngine.reset()
+                }
                 deps.suppressor.apply(effectiveState)
+                appliedState.value = effectiveState
                 updateNotification(effectiveState)
             }
+        }
+
+        // A headset that stays away is a session that is over: switch the master switch off rather
+        // than sit in "No signal" indefinitely. The backoff reconnect keeps trying until then.
+        scope.launch {
+            deps.eegSource.status
+                .map { it.usable }
+                .distinctUntilChanged()
+                .mapLatest { usable ->
+                    if (!usable) {
+                        delay(STOP_AFTER_SIGNAL_LOSS_MS)
+                        Log.w(TAG, "No usable signal for ${STOP_AFTER_SIGNAL_LOSS_MS / 1000}s — ending the session")
+                        stopSelf()
+                    }
+                }
+                .collect()
         }
 
         scope.launch {
             deps.focusEngine.decisions.collect { decision ->
                 deps.sessionRecorder.onDecision(decision)
-            }
-        }
-
-        scope.launch { watchForHeadsetRemoved() }
-    }
-
-    private suspend fun watchForHeadsetRemoved() {
-        var consecutiveNoContact = 0
-        deps.eegSource.status.collect { status ->
-            val allNoContact = status.contact.worst >= com.example.compx551a4.core.ContactQuality.NO_CONTACT
-            consecutiveNoContact = if (allNoContact) consecutiveNoContact + 1 else 0
-            if (consecutiveNoContact == REMOVED_DWELL_TICKS) {
-                deps.suppressor.flush(FlushReason.HEADSET_REMOVED)
             }
         }
     }
@@ -202,13 +230,19 @@ class FocusService : Service() {
         private const val TAG = "FocusService"
         private const val CHANNEL_ID = "focus_service"
         private const val NOTIFICATION_ID = 1001
-        private const val REMOVED_DWELL_TICKS = 5 // ~5 consecutive epochs at ~1Hz
+        /** How long the signal may be unusable before the queue is released and DND lifted. */
+        private const val SIGNAL_GRACE_MS = 10_000L
+
+        /** How long without a usable signal before the session switches itself off. */
+        private const val STOP_AFTER_SIGNAL_LOSS_MS = 120_000L
         private const val INITIAL_BACKOFF_MS = 2_000L
         private const val MAX_BACKOFF_MS = 30_000L
 
         private val isRunning = MutableStateFlow(false)
+        private val appliedState = MutableStateFlow(FocusState.UNKNOWN)
 
         val isRunningFlow: StateFlow<Boolean> get() = isRunning
+        val appliedStateFlow: StateFlow<FocusState> get() = appliedState
 
         fun start(context: Context) {
             val intent = Intent(context, FocusService::class.java)
@@ -229,6 +263,7 @@ class FocusService : Service() {
 
 class AndroidServiceController(private val context: Context) : ServiceController {
     override val running: StateFlow<Boolean> = FocusService.isRunningFlow
+    override val appliedState: StateFlow<FocusState> = FocusService.appliedStateFlow
 
     override fun start() = FocusService.start(context)
     override fun stop() = FocusService.stop(context)
