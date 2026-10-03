@@ -54,7 +54,21 @@ class MuseEegSource(
     private var activeMuse: Muse? = null
     private var tickJob: Job? = null
     private var watchdogJob: Job? = null
+    private var scanPollJob: Job? = null
     private var stopped = true
+
+    /** True only between LibMuse reporting CONNECTED and the link dropping. */
+    @Volatile
+    private var linkUp = false
+
+    /**
+     * After a drop, LibMuse keeps the headband in its list for ~30 s with the discovery time it
+     * had. Connecting to that entry while the headband is switched off just times out, and shows
+     * as "connecting" for the whole wait. Remember the stale time, and only reconnect once the
+     * list entry has been rediscovered more recently than that, i.e. the headband is advertising.
+     */
+    private var staleDiscoveredTime: Double? = null
+    private var loggedWaitingForAdvert = false
 
     private val _status = MutableStateFlow(DeviceStatus.DISCONNECTED)
     override val status: StateFlow<DeviceStatus> = _status
@@ -109,12 +123,23 @@ class MuseEegSource(
         manager.startListening()
         Log.d(TAG, "startListening() called, waiting for museListChanged()")
         // LibMuse only fires museListChanged() for headbands it has never seen; one already in its
-        // list from an earlier session is silently "rediscovered", so check the list ourselves.
+        // list from an earlier session is silently "rediscovered", so check the list ourselves —
+        // and keep checking, because a rediscovery after a drop never fires a callback either.
         connectToAvailableMuse()
+        scanPollJob?.cancel()
+        scanPollJob = scope.launch {
+            while (!stopped && activeMuse == null) {
+                delay(SCAN_POLL_MS)
+                connectToAvailableMuse()
+            }
+        }
     }
 
     private fun rescanAfterDrop(reason: String, delayMs: Long) {
+        linkUp = false
         activeMuse?.let { muse ->
+            staleDiscoveredTime = muse.lastDiscoveredTime
+            loggedWaitingForAdvert = false
             muse.unregisterAllListeners()
             muse.disconnect()
         }
@@ -130,6 +155,9 @@ class MuseEegSource(
 
     override fun stop() {
         stopped = true
+        linkUp = false
+        scanPollJob?.cancel()
+        scanPollJob = null
         manager.stopListening()
         activeMuse?.let { muse ->
             muse.unregisterAllListeners()
@@ -152,19 +180,23 @@ class MuseEegSource(
     private fun connectToAvailableMuse() {
         if (activeMuse != null || stopped) return
         val found = manager.muses
-        Log.d(TAG, "muse list: ${found.size} muse(s) found: ${found.map { it.name }}")
-        val candidate = if (preferredMac != null) {
-            found.firstOrNull { it.macAddress == preferredMac }
-        } else {
-            found.firstOrNull()
-        }
+        val wanted = if (preferredMac != null) found.filter { it.macAddress == preferredMac } else found
+        val stale = staleDiscoveredTime
+        val candidate = wanted.firstOrNull { stale == null || it.lastDiscoveredTime > stale }
         if (candidate != null) {
+            Log.d(TAG, "muse list: ${found.size} muse(s) found: ${found.map { it.name }} — connecting to ${candidate.name}")
             manager.stopListening()
             connectTo(candidate)
+        } else if (wanted.isNotEmpty() && !loggedWaitingForAdvert) {
+            loggedWaitingForAdvert = true
+            Log.d(TAG, "${wanted.map { it.name }} still listed from before the drop; waiting for it to advertise again")
         }
     }
 
     private fun connectTo(muse: Muse) {
+        scanPollJob?.cancel()
+        scanPollJob = null
+        linkUp = false
         activeMuse = muse
         synchronized(lock) {
             live = LiveBands()
@@ -192,6 +224,8 @@ class MuseEegSource(
             Log.d(TAG, "connection state -> ${p.currentConnectionState}")
             when (p.currentConnectionState) {
                 ConnectionState.CONNECTED -> {
+                    linkUp = true
+                    staleDiscoveredTime = null
                     synchronized(lock) { lastPacketAtMs = System.currentTimeMillis() }
                     _status.value = _status.value.copy(state = DeviceState.CONNECTED, deviceName = muse.name)
                 }
@@ -202,6 +236,7 @@ class MuseEegSource(
                     if (!stopped) rescanAfterDrop("connection reported DISCONNECTED", RESCAN_DELAY_MS)
                 }
                 ConnectionState.NEEDS_UPDATE, ConnectionState.NEEDS_LICENSE -> {
+                    linkUp = false
                     activeMuse = null
                     _status.value = DeviceStatus.DISCONNECTED
                 }
@@ -303,7 +338,9 @@ class MuseEegSource(
             result
         }
 
-        if (activeMuse == null) return // nothing connected yet, nothing to emit
+        // Nothing connected, or still connecting: no status to derive and nothing to emit. Driving
+        // the state from an empty horseshoe here is what showed "poor contact" during a reconnect.
+        if (activeMuse == null || !linkUp) return
 
         val newState = if (snapshot.contact.allGood) DeviceState.CONNECTED else DeviceState.POOR_CONTACT
         if (newState != _status.value.state) {
@@ -397,6 +434,7 @@ class MuseEegSource(
     companion object {
         private const val TAG = "MuseEegSource"
         private const val RESCAN_DELAY_MS = 2_000L
+        private const val SCAN_POLL_MS = 1_000L
         private const val TP9_INDEX = 0
         private const val TP10_INDEX = 3
         private const val EMG_GAMMA_THRESHOLD = 3.0

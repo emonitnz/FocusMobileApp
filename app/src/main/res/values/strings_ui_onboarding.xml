@@ -57,7 +57,7 @@
     <string name="home_state_unknown">No reading</string>
     <string name="home_state_for">for %1$s</string>
     <string name="home_signal_title">Focus index</string>
-    <string name="home_signal_subtitle">Standard deviations from your rolling baseline. The shaded
+    <string name="home_signal_subtitle">Standard deviations from your calibration baseline. The shaded
         band is the zone where nothing changes.</string>
     <string name="home_signal_waiting">Waiting for the headset to settle…</string>
     <string name="home_device_title">Headset</string>
