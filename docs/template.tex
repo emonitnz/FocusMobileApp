@@ -403,8 +403,142 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 % =============================================================================
 \section{Data processing}
 
-\begin{frame}{Data processing}
+\begin{frame}{From EEG to a focus index}
+  Once a second, the headset's band powers are reduced to a single number.
+
+  \begin{center}
+    \begin{adjustbox}{max width=\textwidth, max totalheight=0.3\textheight}
+      \begin{tikzpicture}[node distance=8mm and 9mm]
+        \node[box,fill=fill1] (muse) {LibMuse\\\footnotesize relative band powers};
+        \node[box,fill=fill2,right=of muse] (epoch) {Epoch\\\footnotesize $\sim$1\,Hz snapshot};
+        \node[box,fill=fill3,right=of epoch] (idx) {Pope index\\\footnotesize $\dfrac{\beta}{\alpha + \theta}$};
+        \node[box,fill=fill4,right=of idx] (gate) {Artifact\\\footnotesize gate};
+
+        \draw[flow] (muse) -- (epoch);
+        \draw[flow] (epoch) -- (idx);
+        \draw[flow] (idx) -- (gate);
+      \end{tikzpicture}
+    \end{adjustbox}
+  \end{center}
+
+  \small
+  \begin{itemize}
+    \item Only changing values count, since LibMuse resends the last clean value whenever it is rejecting a window.
+    \item Alpha comes from the temporal electrodes (TP9/TP10), which pick up fewer eye blinks.
+    \item Engagement index from Pope et al.\ (1995): beta rises and alpha and theta fall as engagement goes up.
+  \end{itemize}
+
 \end{frame}
+
+\begin{frame}{Rejecting bad data}
+  Every epoch passes through a gate before it can affect the focus state.
+  Rejected epochs are never used to decide whether to enter or leave a focused state.
+
+  \vspace{0.2cm}
+  \small
+  \begin{center}
+    \begin{tabular}{@{}l l@{}}
+      \toprule
+      \textbf{Check} & \textbf{Rejects when} \\
+      \midrule
+      Source flags   & Headset reports a blink, jaw clench, head movement or muscle noise \\
+      Contact        & Any of the four electrodes has poor contact \\
+      Finite         & Index or a band power is NaN or infinite \\
+      Muscle         & $\beta > $ 1.3 $\times$ the median of the last minute \\
+      Hold-off       & Within 2\,s of an earlier rejection \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Normalising and deciding}
+  \begin{columns}[T]
+    \begin{column}{0.46\textwidth}
+      \small
+      \textbf{Smoothed, then scored}
+      \begin{itemize}
+        \item Mean of the last 8 accepted epochs
+        \item z-score against the calibration run's mean and SD
+        \item If uncalibrated we use the last 10 minutes instead
+      \end{itemize}
+
+      \textbf{Two thresholds, with dwell}
+      \begin{itemize}
+        \item Above $T_\text{high}$ for 10\,s $\Rightarrow$ \alert{Focused}
+        \item Below $T_\text{low}$ for 60\,s $\Rightarrow$ \alert{Not focused}
+        \item In between keeps the current state
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.52\textwidth}
+      \begin{center}
+        \begin{adjustbox}{max width=\textwidth, max totalheight=0.62\textheight}
+          \begin{tikzpicture}[x=0.55cm,y=0.9cm]
+            % focused period
+            \fill[fill3] (4.2,-2.1) rectangle (9.3,2);
+            \node[lbl,anchor=north] at (6.75,2) {focused};
+
+            % axes
+            \draw[->,rulegrey] (0,-2.1) -- (12.5,-2.1) node[lbl,below left]{time};
+            \draw[->,rulegrey] (0,-2.1) -- (0,2.1) node[lbl,above]{z};
+
+            % thresholds
+            \draw[dashed,thick] (0,0.6) -- (12,0.6) node[lbl,right]{$T_\text{high}$};
+            \draw[dashed,thick] (0,-0.3) -- (12,-0.3) node[lbl,right]{$T_\text{low}$};
+
+            % z trace
+            \draw[thick,blue!60!black] plot[smooth] coordinates {
+              (0,-0.8) (1,-0.2) (2,0.3) (2.6,0.8) (3.2,0.9) (3.8,1.1) (4.2,1.0)
+              (5,0.4) (5.6,0.2) (6.2,0.9) (7,1.2) (7.6,0.7) (8,-0.5) (8.6,-0.7)
+              (9.3,-0.6) (10,-1.0) (11,-0.8) (12,-1.1)
+            };
+
+            % dwell markers
+            \draw[|-|,thin] (2.6,1.6) -- node[lbl,above]{entry dwell} (4.2,1.6);
+            \draw[|-|,thin] (8,-1.3) -- node[lbl,below]{exit dwell} (9.3,-1.3);
+          \end{tikzpicture}
+        \end{adjustbox}
+      \end{center}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+ 
+\begin{frame}{Calibrating to the user}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \small
+      \textbf{Fitting the thresholds}
+      \begin{itemize}
+        \item Nine one-minute blocks at low, medium and high load.
+        \item Blocks under 50\% task accuracy dropped.
+        \item Thresholds either side of the low--high midpoint.
+      \end{itemize}
+
+      \textbf{Quality check}
+      \begin{itemize}
+        \item AUC: chance a high-load epoch beats a low-load one.
+        \item Below 0.6: old thresholds kept.
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.46\textwidth}
+      \small
+      \textbf{Detecting drift}
+      \begin{itemize}
+        \item Live mean and spread are compared with the calibration run.
+        \item Mean moved $>$ 1 SD, or spread changed $>$ 2$\times$.
+        \item Has to persist for 2 minutes before the user is asked to recalibrate.
+      \end{itemize}
+
+      \vspace{0.2cm}
+      \textbf{Fail open: a poor calibration never starts suppressing notifications.
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
 
 % =============================================================================
 \section{Visualisation and summary data}
@@ -415,8 +549,122 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 % =============================================================================
 \section{Cultural and ethical considerations}
 
-\begin{frame}{Cultural and ethical considerations}
+\begin{frame}{Why brainwave data needs care}
+  \begin{columns}[T]
+    \begin{column}{0.46\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{Involuntary:} You cannot choose what your brain gives off.
+        \item \textbf{Revealing:} Focus, fatigue and stress can be inferred, and maybe more later.
+        \item \textbf{Permanent:} If it is leaked, it cannot be changed.
+        \item Specific legal protections in many jurisdications
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.5\textwidth}
+      \small
+      \textbf{What our app keeps}
+
+      \vspace{0.15cm}
+      \begin{tabular}{@{}l l@{}}
+        \toprule
+        \textbf{Data} & \textbf{Kept as} \\
+        \midrule
+        Raw EEG          & Never stored \\
+        Focus decisions  & Session totals only \\
+        Thresholds       & z-scores, not brain power \\
+        Notifications    & In memory, until released \\
+        \bottomrule
+      \end{tabular}
+
+      \vspace{0.25cm}
+      The app has no internet permission, so it cannot send anything to a server itself.
+    \end{column}
+  \end{columns}
+
+  \note{
+    - EEG is not like step counts. You cannot decide what your brain emits, and you cannot reset it like a password if it leaks\\
+    - Today we only infer focus, but the same recordings could reveal more as methods improve, so what is collected now matters later\\
+    - Laws are catching up: Chile added protection of mental integrity to its constitution in 2021, and Colorado added neural data to its sensitive data category in 2024\\
+    - Our design choice was data minimisation. Raw EEG is processed once a second and thrown away\\
+    - What persists is session totals for the stats screen and thresholds stored as z-scores, which say nothing about your absolute brain activity\\
+    - The manifest has no INTERNET permission, so the app itself cannot upload anything
+  }
 \end{frame}
+
+\begin{frame}{Consent and privacy}
+
+      \textbf{What we do}
+      \begin{itemize}
+        \item Onboarding asks for each permission separately, with a plain reason, and can be skipped
+        \item No session is recorded until the user flicks a switch
+        \item Only the app name and title of each notification are read
+      \end{itemize}
+
+
+      \textbf{Still to consider}
+      \begin{itemize}
+        \item Notifications come from other people who never agreed to the app reading them
+      \end{itemize}
+
+
+\end{frame}
+
+\begin{frame}{Bias in wearables and research}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Where bias comes in}
+      \begin{itemize}
+
+        \item The engagement index comes from a small 1990s lab study, not a diverse population
+        \item Brains differ, for example people with ADHD can show different theta and beta patterns
+        \item Calibration tasks can be biased
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{How the design responds}
+      \begin{itemize}
+        \item Calibrated per user, so nobody is compared against a population average
+        \item If the index does not work for someone (AUC below 0.6), the app does not act on it
+        \item Poor contact fails open, so notifications are never wrongly held
+      \end{itemize}
+
+      \vspace{0.2cm}
+      But failing open still means those users get no benefit.
+    \end{column}
+  \end{columns}
+
+
+\end{frame}
+
+\begin{frame}{Data sovereignty and data as taonga}
+  \small
+  Under Māori data sovereignty, data about people is a taonga: something to be looked after, with rights belonging to the people it comes from.
+
+  \vspace{0.2cm}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{itemize}
+        \item The head is \textbf{tapu}, the most sacred part of the body, so a device worn on it and data drawn from it deserve extra care.
+        \item \textbf{Rangatiratanga:} people control their own data.
+        \item \textbf{Kaitiakitanga:} those holding data act as its guardians.
+      \end{itemize}
+    \end{column}
+
+    \begin{column}{0.48\textwidth}
+      \begin{itemize}
+        \item Keeping data on the user's phone keeps it in their hands and under New Zealand law.
+        \item Cloud backup can send data offshore.
+        \item Research use would need the community involved from the start, not only individual consent.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
 
 % =============================================================================
 \section{Reflection and future work}
