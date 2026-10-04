@@ -34,6 +34,6 @@ Can you think of any other ideas, or any problems with the ideas as proposed? I'
 
 Once the design document was in place I was able to prompt the LLM to complete the UI section based on the contents of DESIGN.md.
 
-#### Testing and Verification:
+#### Testing and Verification:/
 
 Several hours of prompting to fix UI quirks, some minor bugs, and having the LLM monitor data from the live application running while connected to the Muse to ensure there were no issues. This was many, smaller prompts which I won't list here.
