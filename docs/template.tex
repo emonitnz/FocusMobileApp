@@ -558,64 +558,35 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 % =============================================================================
 \section{Cultural and ethical considerations}
 
-\begin{frame}{Why brainwave data needs care}
+\begin{frame}{Brainwave data and data sovereignty}
+  \footnotesize
   \begin{columns}[T]
-    \begin{column}{0.46\textwidth}
-      \small
-      \begin{itemize}
+    \begin{column}{0.47\textwidth}
+      \textbf{Why brainwave data needs care}
+      \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{0pt}
         \item \textbf{Involuntary:} You cannot choose what your brain gives off.
         \item \textbf{Revealing:} Focus, fatigue and stress can be inferred, and maybe more later.
         \item \textbf{Permanent:} If it is leaked, it cannot be changed.
-        \item Specific legal protections in many jurisdications
+      \end{itemize}
+      \textbf{Keeping it local}
+      \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{0pt}
+        \item Keeping data on the user's phone keeps it in their hands and under New Zealand law.
+        \item Cloud backup can send data offshore.
       \end{itemize}
     \end{column}
 
     \begin{column}{0.5\textwidth}
-      \small
-      \textbf{What our app keeps}
+      \textbf{Data as taonga}
 
-      \vspace{0.15cm}
-      \begin{tabular}{@{}l l@{}}
-        \toprule
-        \textbf{Data} & \textbf{Kept as} \\
-        \midrule
-        Raw EEG          & Never stored \\
-        Focus decisions  & Session totals only \\
-        Thresholds       & z-scores, not brain power \\
-        Notifications    & In memory, until released \\
-        \bottomrule
-      \end{tabular}
-
-      \vspace{0.25cm}
-      The app has no internet permission, so it cannot send anything to a server itself.
+      Under Māori data sovereignty, data about people is a taonga: something to be looked after, with rights belonging to the people it comes from.
+      \begin{itemize}\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{0pt}
+        \item The head is \textbf{tapu}, the most sacred part of the body, so a device worn on it and data drawn from it deserve extra care.
+        \item \textbf{Rangatiratanga:} people control their own data.
+        \item \textbf{Kaitiakitanga:} those holding data act as its guardians.
+        \item Research use would need the community involved from the start, not only individual consent.
+      \end{itemize}
     \end{column}
   \end{columns}
-
-  \note{
-    - EEG is not like step counts. You cannot decide what your brain emits, and you cannot reset it like a password if it leaks\\
-    - Today we only infer focus, but the same recordings could reveal more as methods improve, so what is collected now matters later\\
-    - Laws are catching up: Chile added protection of mental integrity to its constitution in 2021, and Colorado added neural data to its sensitive data category in 2024\\
-    - Our design choice was data minimisation. Raw EEG is processed once a second and thrown away\\
-    - What persists is session totals for the stats screen and thresholds stored as z-scores, which say nothing about your absolute brain activity\\
-    - The manifest has no INTERNET permission, so the app itself cannot upload anything
-  }
-\end{frame}
-
-\begin{frame}{Consent and privacy}
-
-      \textbf{What we do}
-      \begin{itemize}
-        \item Onboarding asks for each permission separately, with a plain reason, and can be skipped
-        \item No session is recorded until the user flicks a switch
-        \item Only the app name and title of each notification are read
-      \end{itemize}
-
-
-      \textbf{Still to consider}
-      \begin{itemize}
-        \item Notifications come from other people who never agreed to the app reading them
-      \end{itemize}
-
 
 \end{frame}
 
@@ -649,31 +620,44 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 
 \end{frame}
 
-\begin{frame}{Data sovereignty and data as taonga}
-  \small
-  Under Māori data sovereignty, data about people is a taonga: something to be looked after, with rights belonging to the people it comes from.
 
-  \vspace{0.2cm}
+\begin{frame}{Consent and privacy}
   \begin{columns}[T]
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.51\textwidth}
+      \small
+      \textbf{What we do}
       \begin{itemize}
-        \item The head is \textbf{tapu}, the most sacred part of the body, so a device worn on it and data drawn from it deserve extra care.
-        \item \textbf{Rangatiratanga:} people control their own data.
-        \item \textbf{Kaitiakitanga:} those holding data act as its guardians.
+        \item Onboarding asks for each permission separately, with a plain reason, and can be skipped
+        \item No session is recorded until the user flicks a switch
+        \item Only the app name and title of each notification are read
+      \end{itemize}
+
+      \textbf{Still to consider}
+      \begin{itemize}
+        \item Notifications come from other people who never agreed to the app reading them
       \end{itemize}
     \end{column}
 
-    \begin{column}{0.48\textwidth}
-      \begin{itemize}
-        \item Keeping data on the user's phone keeps it in their hands and under New Zealand law.
-        \item Cloud backup can send data offshore.
-        \item Research use would need the community involved from the start, not only individual consent.
-      \end{itemize}
+    \begin{column}{0.46\textwidth}
+      \small
+      \textbf{What our app keeps}
+
+      \vspace{0.15cm}
+      \begin{tabular}{@{}l l@{}}
+        \toprule
+        \textbf{Data} & \textbf{Kept as} \\
+        \midrule
+        Raw EEG          & Never stored \\
+        Focus decisions  & Session totals only \\
+        Thresholds       & z-scores, not brain power \\
+        Notifications    & In memory, until released \\
+        \bottomrule
+      \end{tabular}
     \end{column}
   \end{columns}
-
 \end{frame}
 
+ 
 
 % =============================================================================
 \section{Reflection and future work}
