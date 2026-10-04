@@ -147,7 +147,12 @@
 \usepackage[overridenote,duration=10,lastminutes=2]{pdfpc}
 
 % ------------------------------------------------------------------ title ---
-% \titlegraphic{\hfill\includegraphics[height=2.8cm]{figures/logo.png}}
+% The launcher icon, regenerated at 1024 px from the same colours and font as
+% app/src/main/res (TealPrimary #2F6F6A, Liberation Sans Bold in #B8DEDA).
+% metropolis puts the title graphic in a zero-height vbox so it overlays the
+% title block, which TeX reports as an "Overfull \vbox (101pt too high)" on
+% the title page. Nothing is clipped; that warning is expected.
+\titlegraphic{\hfill\includegraphics[height=2.8cm]{figures/logo.png}}
 \title{COMPX551 Assignment 4}
 \subtitle{Muse Headset}
 \author{Hamish, Jesse, Mohammad, Richard}
