@@ -675,42 +675,30 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 
 \begin{frame}{Reflection and future work}
   \begin{columns}[T]
-    \begin{column}{0.5\textwidth}
-      \small
+    \begin{column}{0.48\textwidth}
       \textbf{What we learned}
       \begin{itemize}
-        \item Fakes behind every interface let four people build in parallel;
-              the real phone still found what no fake could
-        \item Replaying 11 minutes of real reading: \alert{0\,\%} focused with
-              rolling normalisation, \alert{98\,\%} against the calibration
-              baseline with 8-epoch smoothing
-        \item Consumer EEG is noisy: one epoch in three was rejected for
-              blinks, so fail-open everywhere was the right default
+        \item Four people building four modules at once is hard; agreeing the
+              interfaces early is what made it work
+        \item Real EEG is much noisier than we expected, which is why the app
+              always lets notifications through when in doubt
       \end{itemize}
     \end{column}
-    \begin{column}{0.46\textwidth}
-      \small
+    \begin{column}{0.48\textwidth}
       \textbf{Future work}
       \begin{itemize}
-        \item Evaluation: leave-one-block-out AUC per user, and experience
-              sampling against the state machine in the wild
-        \item Sensor fusion (screen state, foreground app, stillness, calendar)
-              so it degrades gracefully when the headset is off
-        \item Open decisions: a slowly drifting baseline, whether the muscle
-              rule rejects real focus, and consent for the people whose
-              notifications we hold
+        \item Test it properly, with more people and over longer sessions
+        \item Add other signals, like screen activity, so it still helps when
+              the headset is off
       \end{itemize}
     \end{column}
   \end{columns}
 
   \note{
-    - Two things to say about the process. The interface-and-fake approach genuinely worked: four people, four modules, nobody blocked\\
-    - But integration on the real phone still found behaviour no fake showed. One electrode dipping for four seconds flushed the whole queue and toggled DND twice, so we added a 10 second grace period\\
-    - The big one: with the rolling-window normalisation, 11 minutes of real reading gave zero percent focused, because the window normalised long focus away. Normalising against the calibration run instead gave 87 percent, and smoothing over 8 epochs gave 98\\
-    - Consumer EEG is noisy. Roughly one epoch in three was thrown out for blinks. That is why fail-open runs through every stage; a bad signal never holds a notification\\
-    - Future work, three things. First, evaluation we scoped but did not run: leave-one-block-out AUC on the logged calibration sessions, and experience sampling to check the state machine against what people say they were doing\\
-    - Second, sensor fusion: screen state, foreground app, stillness and calendar as a hedge, so the app still does something useful with the headset off. Deliberately excluded here to keep the question clean: can EEG alone do this?\\
-    - Third, decisions we have not made: should the baseline drift slowly rather than stay fixed until recalibration; does the muscle rule reject real concentration; and the senders of the notifications we hold never agreed to any of this
+    - Two quick reflections. Building with four people on separate modules was the hard part; fixing the interfaces early, with a fake behind each one, is what let us work in parallel without blocking each other\\
+    - And real EEG is noisy. Far noisier than we expected going in. That is the reason the app fails open at every stage: when in doubt, let the notification through\\
+    - Future work: test it properly, with more people and longer sessions than we managed here\\
+    - And add other signals, screen activity for example, so the app still does something useful when the headset is off
   }
 \end{frame}
 
