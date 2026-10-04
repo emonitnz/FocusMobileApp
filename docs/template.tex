@@ -409,7 +409,71 @@ SDK (\file{LibMuse}) rather than the Wear OS Data Layer API.
 % =============================================================================
 \section{Visualisation and summary data}
 
-\begin{frame}{Visualisation and summary data}
+\begin{frame}{Live view: what the headset is saying right now}
+  \begin{columns}[T]
+    \begin{column}{0.36\textwidth}
+      \begin{center}
+        \includegraphics[height=0.74\textheight,keepaspectratio,trim=0 70 0 110,clip]{figures/home.png}
+      \end{center}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \small
+      \begin{itemize}
+        \item \alert{Focus index}: the last two minutes at 1\,Hz, in standard
+              deviations from the user's own calibration baseline
+        \item The shaded band is the hysteresis zone between the two
+              thresholds, where nothing changes
+        \item Artifact-rejected epochs \emph{break} the line rather than being
+              interpolated over; the y-range is fixed at $\pm3$\,SD so a calm
+              signal looks calm
+        \item State pill with time-in-state, per-electrode contact quality,
+              and the held-back queue as ``app $\cdot$ count'', never message
+              content
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \note{
+    - Home screen is the live view: one glance tells you the state, the signal and whether the headset is actually making contact\\
+    - The chart is the focus index for the last 120 seconds, one point per second, in SDs from the user's own calibration baseline, not raw band power\\
+    - Shaded band = the hysteresis zone between T\_high and T\_low. Inside it nothing changes, so you can see why the state did or didn't flip\\
+    - Two deliberate choices: rejected epochs (blinks, jaw clench) break the line instead of being smoothed over, and the y-axis is a fixed plus or minus 3 SD so a calm signal looks calm instead of auto-scaling into noise\\
+    - Below it: contact quality per electrode, and the held-back card shows only app and count. Showing the messages here would be the interruption the app exists to prevent
+  }
+\end{frame}
+
+\begin{frame}{Summary data: what a week of focus looks like}
+  \begin{columns}[T]
+    \begin{column}{0.36\textwidth}
+      \begin{center}
+        \includegraphics[height=0.74\textheight,keepaspectratio,trim=0 70 0 110,clip]{figures/stats.png}
+      \end{center}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \small
+      \begin{itemize}
+        \item One record per session: focused time, longest streak,
+              notifications held back and delivered
+        \item Focused time is measured \alert{between state transitions},
+              not by counting FOCUSED epochs, so a dropped packet never
+              shortens the total
+        \item \alert{When you focus}: focused minutes by hour of day, summed
+              across every session, so the user can see when they do their
+              best work
+        \item Stored on-device as one JSON line per session, written once at
+              session end; every total is computed on read, nothing leaves
+              the phone
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \note{
+    - Stats tab is the summary data. Four numbers at the top: total focus, longest unbroken streak, notifications held back, notifications delivered\\
+    - Focused time is measured between transitions into and out of FOCUSED, not by counting focused epochs, so one dropped or rejected packet does not quietly shave seconds off the total\\
+    - The chart is focused minutes by hour of day across all sessions. This user clearly does their best work mid-morning, so that is when to put the headset on\\
+    - Persistence is deliberately simple: one JSON line per session, appended once when the session ends, kept in the app's private storage. Decisions arrive at 1 Hz for hours, so nothing is written per decision\\
+    - All the totals are computed on read from that list. No database, no server, nothing leaves the phone
+  }
 \end{frame}
 
 % =============================================================================
